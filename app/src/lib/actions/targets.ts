@@ -32,16 +32,27 @@ export async function getTarget(id: string): Promise<Target | null> {
   return rows[0] ?? null
 }
 
-export async function createTarget(input: {
+type TargetInput = {
   alias: string
   age?: number
+  gender?: string
   job?: string
   matchPlatform?: string
   avatarEmoji?: string
   goal?: TargetGoal
   notes?: string
   firstContactAt?: number
-}): Promise<Target> {
+  mbti?: string
+  background?: string
+  commonGround?: string
+  relationshipHistory?: string
+  physicalDescription?: string
+  interests?: string[]
+  currentSituation?: string
+  stage?: string
+}
+
+export async function createTarget(input: TargetInput): Promise<Target> {
   await ensureSchema()
   const self = await getSelfOrThrow()
 
@@ -53,13 +64,21 @@ export async function createTarget(input: {
       selfId: self.id,
       alias: input.alias,
       age: input.age ?? null,
+      gender: input.gender ?? null,
       job: input.job ?? null,
       matchPlatform: input.matchPlatform ?? null,
       avatarEmoji: input.avatarEmoji ?? '💭',
       goal: input.goal ?? { preset: 'explore', description: '일단 탐색' },
       notes: input.notes ?? null,
       firstContactAt: input.firstContactAt ? new Date(input.firstContactAt) : null,
-      stage: 'matched',
+      mbti: input.mbti ?? null,
+      background: input.background ?? null,
+      commonGround: input.commonGround ?? null,
+      relationshipHistory: input.relationshipHistory ?? null,
+      physicalDescription: input.physicalDescription ?? null,
+      interests: input.interests ?? [],
+      currentSituation: input.currentSituation ?? null,
+      stage: (input.stage as Target['stage']) ?? 'matched',
       profile: {},
       stats: {
         messageCount: 0,
@@ -106,23 +125,21 @@ export async function updateTargetStage(
   return updated
 }
 
+const TARGET_META_FIELDS = [
+  'alias', 'age', 'gender', 'job', 'matchPlatform', 'notes', 'avatarEmoji',
+  'tags', 'mbti', 'background', 'commonGround', 'relationshipHistory',
+  'physicalDescription', 'interests', 'currentSituation',
+] as const
+
 export async function updateTargetMeta(
   id: string,
-  input: {
-    alias?: string
-    age?: number
-    job?: string
-    matchPlatform?: string
-    notes?: string
-    avatarEmoji?: string
-    tags?: string[]
-  }
+  input: Partial<Record<(typeof TARGET_META_FIELDS)[number], unknown>>
 ): Promise<Target> {
   await ensureSchema()
   const updates: Record<string, unknown> = { updatedAt: new Date() }
-  for (const k of ['alias', 'age', 'job', 'matchPlatform', 'notes', 'avatarEmoji', 'tags']) {
-    const v = (input as Record<string, unknown>)[k]
-    if (v !== undefined) updates[k === 'matchPlatform' ? 'matchPlatform' : k] = v
+  for (const k of TARGET_META_FIELDS) {
+    const v = input[k]
+    if (v !== undefined) updates[k] = v
   }
   const [updated] = await db
     .update(targets)

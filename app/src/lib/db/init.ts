@@ -19,6 +19,14 @@ export async function ensureSchema() {
       age INTEGER,
       relationship_goal TEXT,
       tone_samples TEXT NOT NULL DEFAULT '[]',
+      mbti TEXT,
+      strengths TEXT NOT NULL DEFAULT '[]',
+      weaknesses TEXT NOT NULL DEFAULT '[]',
+      deal_breakers TEXT NOT NULL DEFAULT '[]',
+      ideal_type TEXT,
+      personality_notes TEXT,
+      values_notes TEXT,
+      experience_level TEXT,
       psych_profile TEXT NOT NULL DEFAULT '{}',
       notes TEXT
     )
@@ -32,10 +40,18 @@ export async function ensureSchema() {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       alias TEXT NOT NULL,
       age INTEGER,
+      gender TEXT,
       job TEXT,
       match_platform TEXT,
       first_contact_at INTEGER,
       avatar_emoji TEXT DEFAULT '💭',
+      mbti TEXT,
+      background TEXT,
+      common_ground TEXT,
+      relationship_history TEXT,
+      physical_description TEXT,
+      interests TEXT NOT NULL DEFAULT '[]',
+      current_situation TEXT,
       stage TEXT NOT NULL DEFAULT 'matched',
       goal TEXT NOT NULL DEFAULT '{"preset":"explore","description":"일단 탐색"}',
       latest_profile_snapshot_id TEXT,
@@ -80,6 +96,7 @@ export async function ensureSchema() {
       situation_report TEXT NOT NULL,
       goal_alignment TEXT,
       options TEXT NOT NULL,
+      todos TEXT NOT NULL DEFAULT '[]',
       chosen_option_id TEXT,
       outcome TEXT,
       outcome_note TEXT
@@ -89,4 +106,36 @@ export async function ensureSchema() {
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_interactions_target ON interactions(target_id, occurred_at)`)
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_snapshots_target ON profile_snapshots(target_id, created_at)`)
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_strategies_target ON strategies(target_id, created_at)`)
+
+  // ─────────────────────────────────────────────────────────────
+  // 기존 DB(컬럼 일부 누락)에 대해 idempotent ALTER. SQLite는
+  // ADD COLUMN IF NOT EXISTS가 없어서 try/catch로 존재 여부 처리.
+  // ─────────────────────────────────────────────────────────────
+  await tryAdd('selves', 'mbti', 'TEXT')
+  await tryAdd('selves', 'strengths', "TEXT NOT NULL DEFAULT '[]'")
+  await tryAdd('selves', 'weaknesses', "TEXT NOT NULL DEFAULT '[]'")
+  await tryAdd('selves', 'deal_breakers', "TEXT NOT NULL DEFAULT '[]'")
+  await tryAdd('selves', 'ideal_type', 'TEXT')
+  await tryAdd('selves', 'personality_notes', 'TEXT')
+  await tryAdd('selves', 'values_notes', 'TEXT')
+  await tryAdd('selves', 'experience_level', 'TEXT')
+
+  await tryAdd('targets', 'gender', 'TEXT')
+  await tryAdd('targets', 'mbti', 'TEXT')
+  await tryAdd('targets', 'background', 'TEXT')
+  await tryAdd('targets', 'common_ground', 'TEXT')
+  await tryAdd('targets', 'relationship_history', 'TEXT')
+  await tryAdd('targets', 'physical_description', 'TEXT')
+  await tryAdd('targets', 'interests', "TEXT NOT NULL DEFAULT '[]'")
+  await tryAdd('targets', 'current_situation', 'TEXT')
+
+  await tryAdd('strategies', 'todos', "TEXT NOT NULL DEFAULT '[]'")
+}
+
+async function tryAdd(table: string, column: string, type: string) {
+  try {
+    await db.run(sql.raw(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`))
+  } catch {
+    // 이미 존재. 무시.
+  }
 }

@@ -47,6 +47,9 @@ type SelfProfileResult = {
     evidence: string
     confidence: number
   }>
+  // 유저 자가선언엔 없지만 AI가 대화 데이터에서 발견한 것들 — 추가 제안용
+  suggestedStrengths?: string[]
+  suggestedWeaknesses?: string[]
 }
 
 const dimSchema = (label: string) => ({
@@ -116,14 +119,28 @@ const SELF_TOOL = {
         items: { type: 'string' },
         maxItems: 6,
         description:
-          '유저가 연애 운영에서 잘하는 것. 구체적으로 (예: "유머로 어색함 깨기 능함", "경청 잘함"). 근거 없으면 빈 배열.',
+          '유저가 연애 운영에서 잘하는 것. **유저가 이미 자가선언한 강점은 그대로 유지하고, 대화에서 관찰된 근거로 보강**. 새 항목 추가 자제 (그건 suggestedStrengths로).',
       },
       weaknesses: {
         type: 'array',
         items: { type: 'string' },
         maxItems: 6,
         description:
-          '반복되는 약점 (예: "확정 단계에서 회피", "너무 빠른 답장으로 간절함 드러남"). 근거 없으면 빈 배열.',
+          '반복되는 약점. **유저 자가선언 약점을 우선 반영**. 새로 발견한 약점은 suggestedWeaknesses로.',
+      },
+      suggestedStrengths: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 4,
+        description:
+          '대화 데이터에서 새로 발견한, 유저가 **자가선언하지 않은** 강점 후보. 유저에게 "추가할래?" 제안 용도. 2개 이상의 관계에서 반복 관찰될 때만.',
+      },
+      suggestedWeaknesses: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 4,
+        description:
+          '대화 데이터에서 새로 발견한, 유저가 **자가선언하지 않은** 약점 후보. 2개 이상 관계에서 반복일 때만.',
       },
       patterns: {
         type: 'array',
@@ -135,6 +152,8 @@ const SELF_TOOL = {
       playbook: {
         type: 'array',
         maxItems: 8,
+        description:
+          '특정 맥락(상대 타입 + 단계)에서 유저가 성공/실패한 전략 집계',
         items: {
           type: 'object',
           properties: {
@@ -154,8 +173,6 @@ const SELF_TOOL = {
           },
           required: ['when', 'strategy', 'evidence', 'confidence'],
         },
-        description:
-          'outcome이 기록된 전략이 최소 2개 이상일 때만 작성. 집계된 학습 결과.',
       },
     },
     required: ['summary', 'strengths', 'weaknesses', 'patterns', 'playbook'],
@@ -235,16 +252,22 @@ export async function updateSelfProfile(self: Self): Promise<SelfPsychProfile> {
   if (self.age) sections.push(`- 나이: ${self.age}`)
   if (self.gender) sections.push(`- 성별: ${self.gender}`)
   if (self.orientation) sections.push(`- 지향: ${self.orientation}`)
+  if (self.mbti) sections.push(`- MBTI: ${self.mbti}`)
+  if (self.experienceLevel) sections.push(`- 연애 경험: ${self.experienceLevel}`)
   if (self.relationshipGoal) sections.push(`- 관계 지향: ${self.relationshipGoal}`)
-  if (self.notes) sections.push(`- 자기 기술: ${self.notes}`)
 
   sections.push('')
-  sections.push(`## [대화 톤 샘플 — ${self.toneSamples.length}개]`)
-  if (self.toneSamples.length === 0) {
-    sections.push('(없음)')
-  } else {
-    self.toneSamples.forEach((s, i) => sections.push(`${i + 1}. "${s}"`))
-  }
+  sections.push('## [유저 자가 선언] ★ 이 값들은 존중. weaknesses/strengths output에 우선 포함.')
+  if (self.strengths.length > 0)
+    sections.push(`- 강점: ${self.strengths.join(' / ')}`)
+  if (self.weaknesses.length > 0)
+    sections.push(`- 약점: ${self.weaknesses.join(' / ')}`)
+  if (self.dealBreakers.length > 0)
+    sections.push(`- 딜 브레이커: ${self.dealBreakers.join(' / ')}`)
+  if (self.idealType) sections.push(`- 이상형: ${self.idealType}`)
+  if (self.personalityNotes) sections.push(`- 성격 기술: ${self.personalityNotes}`)
+  if (self.valuesNotes) sections.push(`- 가치관 기술: ${self.valuesNotes}`)
+  if (self.notes) sections.push(`- 기타: ${self.notes}`)
 
   sections.push('')
   sections.push(`## [관리 중인 상대 ${allTargets.length}명]`)
@@ -324,6 +347,8 @@ export async function updateSelfProfile(self: Self): Promise<SelfPsychProfile> {
     weaknesses: result.weaknesses,
     patterns: result.patterns,
     playbook: result.playbook,
+    suggestedStrengths: result.suggestedStrengths ?? [],
+    suggestedWeaknesses: result.suggestedWeaknesses ?? [],
     basedOn,
     lastProfiledAt: Date.now(),
   }

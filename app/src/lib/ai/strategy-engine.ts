@@ -34,6 +34,11 @@ type StrategyResult = {
     messageDraft?: string
     timing?: string
   }>
+  todos: Array<{
+    text: string
+    when: string
+    priority: 'high' | 'medium' | 'low'
+  }>
 }
 
 const STRATEGY_TOOL = {
@@ -78,15 +83,41 @@ const STRATEGY_TOOL = {
             reward: { type: 'string' },
             messageDraft: {
               type: 'string',
-              description: '유저의 톤 샘플을 반영한 바로 쓸 수 있는 초안',
+              description: '유저의 과거 메시지 스타일을 반영한 바로 쓸 수 있는 초안',
             },
             timing: { type: 'string' },
           },
           required: ['label', 'action', 'rationale', 'risk', 'reward'],
         },
       },
+      todos: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 8,
+        description:
+          '유저가 까먹지 않게 구체적인 할 일 목록. 목표 달성을 위해 "다음 수" 외에도 기억·확인·준비해야 할 것들을 포함. 각 TODO는 실행 가능한 단위로.',
+        items: {
+          type: 'object',
+          properties: {
+            text: {
+              type: 'string',
+              description: '무엇을 할지. 짧고 실행 가능하게. 예: "지난번 가족 얘기 후속 질문하기"',
+            },
+            when: {
+              type: 'string',
+              description:
+                '언제까지. 예: "오늘 21시 전", "48시간 내", "다음 만남 시작 전", "금요일까지"',
+            },
+            priority: {
+              type: 'string',
+              enum: ['high', 'medium', 'low'],
+            },
+          },
+          required: ['text', 'when', 'priority'],
+        },
+      },
     },
-    required: ['situationReport', 'goalAlignment', 'options'],
+    required: ['situationReport', 'goalAlignment', 'options', 'todos'],
   },
 }
 
@@ -204,12 +235,14 @@ ${extras}
 지금 상태를 진단하고, 유저가 설정한 목표("${target.goal.description}")에 수렴하는 다음 수 3~4개를 제안하세요.
 
 제약:
+- **현재 진행 상황(currentSituation)을 최우선 출발점으로 삼아 situationReport를 쓸 것**.
 - 과거 outcome이 "bad"인 전략은 그 유형을 피하거나, 쓴다면 왜 이번엔 다르게 가는지 rationale에 명시.
 - Playbook에 해당 맥락과 매칭되는 성공 패턴이 있으면 그 전략을 최소 한 옵션에 반영.
-- 유저의 **반복 약점**을 자극하는 옵션 지양 — 예: "확정 단계에서 회피" 패턴이면, 확정 요구를 옵션에 넣더라도 단계적 접근으로.
-- 유저의 **강점**을 쓸 수 있는 옵션이 있으면 우선.
-- 메시지 초안은 유저의 톤 샘플 반영.
-- 데이터 부족하면 "더 많은 관찰 필요" 옵션을 포함해도 됨.
+- 유저의 **자가 선언 약점** + AI 추론 weaknesses를 자극하는 옵션 지양 — 단계적 접근으로 우회.
+- 유저의 **자가 선언 강점** + AI 추론 strengths를 쓸 수 있는 옵션이 있으면 우선.
+- **딜 브레이커**에 해당하는 신호가 있으면 situationReport에 경고.
+- 메시지 초안은 유저의 과거 발언 스타일을 흉내.
+- **todos는 3~8개, 구체적 행동 단위로**. 정보 확인(예: "상대 다음 주 스케줄 물어보기"), 준비(예: "데이트 장소 3개 후보 미리 정하기"), 기억 환기(예: "지난번 가족 얘기 후속 묻기") 등 까먹기 쉬운 것 중심으로.
 
 제출: submit_strategy`,
       },
@@ -230,6 +263,14 @@ ${extras}
     timing: o.timing,
   }))
 
+  const todos = (result.todos ?? []).map((t) => ({
+    id: randomUUID(),
+    text: t.text,
+    when: t.when,
+    priority: t.priority,
+    done: false,
+  }))
+
   const strategyId = randomUUID()
   const [saved] = await db
     .insert(strategies)
@@ -245,6 +286,7 @@ ${extras}
       situationReport: result.situationReport,
       goalAlignment: JSON.stringify(result.goalAlignment),
       options,
+      todos,
     })
     .returning()
 

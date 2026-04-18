@@ -66,11 +66,110 @@ export function SelfDossier({ self }: { self: Self }) {
         </button>
       </div>
 
+      {/* 자가선언 요약 카드 */}
+      <Card>
+        <div className="text-xs text-muted mb-2">자가 선언</div>
+        <div className="flex flex-wrap gap-1.5">
+          {self.mbti && <Pill tone="accent">{self.mbti}</Pill>}
+          {self.age && <Pill tone="neutral">{self.age}세</Pill>}
+          {self.gender && (
+            <Pill tone="neutral">
+              {self.gender === 'male' ? '남' : self.gender === 'female' ? '여' : self.gender}
+            </Pill>
+          )}
+          {self.experienceLevel && (
+            <Pill tone="neutral">경험 {self.experienceLevel}</Pill>
+          )}
+        </div>
+        {self.strengths.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[11px] text-muted mb-1">선언한 강점</div>
+            <div className="flex flex-wrap gap-1.5">
+              {self.strengths.map((s, i) => (
+                <Pill key={i} tone="good">
+                  {s}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        )}
+        {self.weaknesses.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[11px] text-muted mb-1">선언한 약점</div>
+            <div className="flex flex-wrap gap-1.5">
+              {self.weaknesses.map((s, i) => (
+                <Pill key={i} tone="bad">
+                  {s}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        )}
+        {self.dealBreakers.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[11px] text-muted mb-1">딜 브레이커</div>
+            <div className="flex flex-wrap gap-1.5">
+              {self.dealBreakers.map((s, i) => (
+                <Pill key={i} tone="bad">
+                  🚫 {s}
+                </Pill>
+              ))}
+            </div>
+          </div>
+        )}
+        {self.idealType && (
+          <div className="mt-3 text-xs text-muted">
+            <span className="font-medium text-text">이상형:</span> {self.idealType}
+          </div>
+        )}
+      </Card>
+
+      {/* AI 제안 */}
+      {((p?.suggestedStrengths?.length ?? 0) > 0 ||
+        (p?.suggestedWeaknesses?.length ?? 0) > 0) && (
+        <Card className="border-accent/40 bg-accent/5">
+          <div className="flex items-center gap-1.5 text-xs text-accent mb-2">
+            ✨ AI가 대화에서 발견한 것
+          </div>
+          {(p?.suggestedStrengths?.length ?? 0) > 0 && (
+            <div className="mb-2">
+              <div className="text-[11px] text-muted mb-1">
+                너가 선언 안 한 강점 (추가할까?)
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {p!.suggestedStrengths!.map((s, i) => (
+                  <Pill key={i} tone="good">
+                    + {s}
+                  </Pill>
+                ))}
+              </div>
+            </div>
+          )}
+          {(p?.suggestedWeaknesses?.length ?? 0) > 0 && (
+            <div>
+              <div className="text-[11px] text-muted mb-1">
+                주의 패턴 (자각했어?)
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {p!.suggestedWeaknesses!.map((s, i) => (
+                  <Pill key={i} tone="bad">
+                    + {s}
+                  </Pill>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="mt-3 text-[11px] text-muted/80 leading-relaxed">
+            아래 "내 정보 편집"에서 확정해서 추가할 수 있어.
+          </div>
+        </Card>
+      )}
+
       {!hasAnything ? (
         <Card>
           <div className="text-sm text-muted">
-            아직 프로파일링된 적 없음. 상대 추가 + 대화 기록 넣고 "재분석" 누르면
-            너의 강점·약점·playbook이 추출돼.
+            AI 추론 프로파일 아직 없음. 상대 추가 + 대화 기록 넣고 "재분석" 누르면
+            Big Five / 애착 / playbook이 생성돼.
           </div>
         </Card>
       ) : (

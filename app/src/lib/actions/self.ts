@@ -22,15 +22,31 @@ export async function getSelfOrThrow(): Promise<Self> {
   return s
 }
 
-export async function createSelf(input: {
-  displayName: string
+type SelfInput = {
+  displayName?: string
   age?: number
   gender?: string
   orientation?: string
   relationshipGoal?: string
   toneSamples?: string[]
   notes?: string
-}): Promise<Self> {
+  mbti?: string
+  strengths?: string[]
+  weaknesses?: string[]
+  dealBreakers?: string[]
+  idealType?: string
+  personalityNotes?: string
+  valuesNotes?: string
+  experienceLevel?: string
+}
+
+const SELF_FIELDS = [
+  'displayName', 'age', 'gender', 'orientation', 'relationshipGoal',
+  'toneSamples', 'notes', 'mbti', 'strengths', 'weaknesses', 'dealBreakers',
+  'idealType', 'personalityNotes', 'valuesNotes', 'experienceLevel',
+] as const
+
+export async function createSelf(input: SelfInput & { displayName: string }): Promise<Self> {
   await ensureSchema()
   const existing = await getOrNullSelf()
   if (existing) {
@@ -48,6 +64,14 @@ export async function createSelf(input: {
       relationshipGoal: input.relationshipGoal ?? null,
       toneSamples: input.toneSamples ?? [],
       notes: input.notes ?? null,
+      mbti: input.mbti ?? null,
+      strengths: input.strengths ?? [],
+      weaknesses: input.weaknesses ?? [],
+      dealBreakers: input.dealBreakers ?? [],
+      idealType: input.idealType ?? null,
+      personalityNotes: input.personalityNotes ?? null,
+      valuesNotes: input.valuesNotes ?? null,
+      experienceLevel: input.experienceLevel ?? null,
       psychProfile: {},
     })
     .returning()
@@ -56,24 +80,13 @@ export async function createSelf(input: {
   return created
 }
 
-export async function updateSelf(input: {
-  displayName?: string
-  age?: number
-  gender?: string
-  orientation?: string
-  relationshipGoal?: string
-  toneSamples?: string[]
-  notes?: string
-}): Promise<Self> {
+export async function updateSelf(input: SelfInput): Promise<Self> {
   await ensureSchema()
   const updates: Record<string, unknown> = {}
-  if (input.displayName !== undefined) updates.displayName = input.displayName
-  if (input.age !== undefined) updates.age = input.age
-  if (input.gender !== undefined) updates.gender = input.gender
-  if (input.orientation !== undefined) updates.orientation = input.orientation
-  if (input.relationshipGoal !== undefined) updates.relationshipGoal = input.relationshipGoal
-  if (input.toneSamples !== undefined) updates.toneSamples = input.toneSamples
-  if (input.notes !== undefined) updates.notes = input.notes
+  for (const k of SELF_FIELDS) {
+    const v = input[k]
+    if (v !== undefined) updates[k] = v
+  }
 
   const [updated] = await db
     .update(selves)
@@ -82,6 +95,7 @@ export async function updateSelf(input: {
     .returning()
 
   revalidatePath('/')
+  revalidatePath('/me')
   revalidatePath('/onboarding')
   return updated
 }

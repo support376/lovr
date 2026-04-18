@@ -53,6 +53,68 @@ export async function chooseStrategyOption(input: {
   revalidatePath(`/t/${s.targetId}`)
 }
 
+export async function toggleStrategyTodo(input: {
+  strategyId: string
+  todoId: string
+  done: boolean
+}) {
+  await ensureSchema()
+  const [s] = await db
+    .select()
+    .from(strategies)
+    .where(eq(strategies.id, input.strategyId))
+    .limit(1)
+  if (!s) throw new Error('전략을 찾을 수 없습니다')
+
+  const updated = s.todos.map((t) =>
+    t.id === input.todoId
+      ? { ...t, done: input.done, doneAt: input.done ? Date.now() : undefined }
+      : t
+  )
+
+  await db
+    .update(strategies)
+    .set({ todos: updated })
+    .where(eq(strategies.id, input.strategyId))
+
+  revalidatePath(`/t/${s.targetId}`)
+  revalidatePath(`/t/${s.targetId}/strategy`)
+}
+
+export async function addCustomTodo(input: {
+  strategyId: string
+  text: string
+  when?: string
+  priority?: 'high' | 'medium' | 'low'
+}) {
+  await ensureSchema()
+  const [s] = await db
+    .select()
+    .from(strategies)
+    .where(eq(strategies.id, input.strategyId))
+    .limit(1)
+  if (!s) throw new Error('전략을 찾을 수 없습니다')
+
+  const { randomUUID } = await import('node:crypto')
+  const next = [
+    ...s.todos,
+    {
+      id: randomUUID(),
+      text: input.text,
+      when: input.when ?? '언제든',
+      priority: input.priority ?? 'medium',
+      done: false,
+    },
+  ]
+
+  await db
+    .update(strategies)
+    .set({ todos: next })
+    .where(eq(strategies.id, input.strategyId))
+
+  revalidatePath(`/t/${s.targetId}/strategy`)
+}
+
 export async function setStrategyOutcome(input: {
   strategyId: string
   outcome: 'good' | 'bad' | 'neutral'

@@ -1,13 +1,24 @@
 'use client'
 import { useState, useTransition } from 'react'
-import { Sparkles, Check, Copy, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
+import {
+  Sparkles,
+  Check,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
+  Minus,
+  ListTodo,
+  Plus,
+} from 'lucide-react'
 import {
   generateStrategyAction,
   chooseStrategyOption,
   setStrategyOutcome,
+  toggleStrategyTodo,
+  addCustomTodo,
 } from '@/lib/actions/strategy'
 import { Button, Card, Pill } from '@/components/ui'
-import type { Strategy, StrategyOption } from '@/lib/db/schema'
+import type { Strategy, StrategyOption, StrategyTodo } from '@/lib/db/schema'
 
 export function StrategyView({
   targetId,
@@ -51,6 +62,7 @@ export function StrategyView({
         </Card>
       )}
 
+      {current && <TodoSection strategy={current} />}
       {current && <StrategyCard strategy={current} />}
 
       {history.length > 1 && (
@@ -271,4 +283,217 @@ function safeJSON<T>(s: string): T | null {
   } catch {
     return null
   }
+}
+
+// ============================================================================
+// TODO 체크리스트
+// ============================================================================
+function TodoSection({ strategy }: { strategy: Strategy }) {
+  const [todos, setTodos] = useState<StrategyTodo[]>(strategy.todos ?? [])
+  const [pending, start] = useTransition()
+  const [newText, setNewText] = useState('')
+  const [newWhen, setNewWhen] = useState('')
+
+  if (todos.length === 0 && !newText) {
+    return (
+      <Card>
+        <div className="flex items-center gap-2 text-sm">
+          <ListTodo size={16} className="text-accent" />
+          <span className="font-semibold">할 일</span>
+          <span className="text-xs text-muted">— 없음</span>
+        </div>
+        <AddTodo
+          value={newText}
+          onChange={setNewText}
+          when={newWhen}
+          setWhen={setNewWhen}
+          onAdd={() => {
+            const text = newText.trim()
+            if (!text) return
+            const when = newWhen.trim() || '언제든'
+            setNewText('')
+            setNewWhen('')
+            start(async () => {
+              await addCustomTodo({ strategyId: strategy.id, text, when })
+              setTodos((prev) => [
+                ...prev,
+                {
+                  id: crypto.randomUUID(),
+                  text,
+                  when,
+                  priority: 'medium',
+                  done: false,
+                },
+              ])
+            })
+          }}
+        />
+      </Card>
+    )
+  }
+
+  const toggle = (id: string, done: boolean) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done, doneAt: done ? Date.now() : undefined } : t))
+    )
+    start(async () => {
+      try {
+        await toggleStrategyTodo({ strategyId: strategy.id, todoId: id, done })
+      } catch (e) {
+        // rollback
+        setTodos((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, done: !done } : t))
+        )
+        alert((e as Error).message)
+      }
+    })
+  }
+
+  const sorted = [...todos].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1
+    const order = { high: 0, medium: 1, low: 2 }
+    return order[a.priority] - order[b.priority]
+  })
+
+  const doneCount = todos.filter((t) => t.done).length
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm">
+          <ListTodo size={16} className="text-accent" />
+          <span className="font-semibold">할 일</span>
+          <span className="text-xs text-muted">
+            {doneCount}/{todos.length}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {sorted.map((t) => (
+          <TodoRow key={t.id} todo={t} onToggle={toggle} disabled={pending} />
+        ))}
+      </div>
+      <div className="mt-3 pt-3 border-t border-border">
+        <AddTodo
+          value={newText}
+          onChange={setNewText}
+          when={newWhen}
+          setWhen={setNewWhen}
+          onAdd={() => {
+            const text = newText.trim()
+            if (!text) return
+            const when = newWhen.trim() || '언제든'
+            setNewText('')
+            setNewWhen('')
+            start(async () => {
+              await addCustomTodo({ strategyId: strategy.id, text, when })
+              setTodos((prev) => [
+                ...prev,
+                {
+                  id: crypto.randomUUID(),
+                  text,
+                  when,
+                  priority: 'medium',
+                  done: false,
+                },
+              ])
+            })
+          }}
+        />
+      </div>
+    </Card>
+  )
+}
+
+function TodoRow({
+  todo,
+  onToggle,
+  disabled,
+}: {
+  todo: StrategyTodo
+  onToggle: (id: string, done: boolean) => void
+  disabled: boolean
+}) {
+  const tone =
+    todo.priority === 'high' ? 'text-bad' : todo.priority === 'low' ? 'text-muted' : 'text-warn'
+  return (
+    <label
+      className={`flex items-start gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+        todo.done
+          ? 'bg-surface-2/40 border-border/50 opacity-60'
+          : 'bg-surface-2 border-border hover:border-accent/40'
+      }`}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onToggle(todo.id, !todo.done)}
+        className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center mt-0.5 ${
+          todo.done
+            ? 'bg-accent border-accent text-white'
+            : 'bg-bg border-border'
+        }`}
+      >
+        {todo.done && <Check size={13} strokeWidth={3} />}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div
+          className={`text-sm leading-snug ${todo.done ? 'line-through' : ''}`}
+        >
+          {todo.text}
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-[11px]">
+          <span className={tone}>● {todo.priority}</span>
+          <span className="text-muted">· {todo.when}</span>
+        </div>
+      </div>
+    </label>
+  )
+}
+
+function AddTodo({
+  value,
+  onChange,
+  when,
+  setWhen,
+  onAdd,
+}: {
+  value: string
+  onChange: (v: string) => void
+  when: string
+  setWhen: (v: string) => void
+  onAdd: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            onAdd()
+          }
+        }}
+        placeholder="할 일 직접 추가"
+        className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent"
+      />
+      <div className="flex gap-2">
+        <input
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+          placeholder="언제까지 (예: 오늘 저녁)"
+          className="flex-1 rounded-lg bg-surface-2 border border-border px-3 py-2 text-xs outline-none focus:border-accent"
+        />
+        <button
+          type="button"
+          onClick={onAdd}
+          disabled={!value.trim()}
+          className="px-3 rounded-lg bg-accent/20 text-accent text-xs font-semibold disabled:opacity-40"
+        >
+          <Plus size={14} className="inline" /> 추가
+        </button>
+      </div>
+    </div>
+  )
 }

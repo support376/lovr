@@ -18,20 +18,38 @@ export const selves = sqliteTable('selves', {
   // 관계 목표 유형
   relationshipGoal: text('relationship_goal'), // 'casual' | 'serious' | 'marriage' | 'explore'
 
-  // 대화 톤 샘플 (JSON string[] — 최대 ~5개)
+  // 대화 톤 샘플 (legacy — 새 온보딩에선 안 씀. AI가 대화로 자동학습)
   toneSamples: text('tone_samples', { mode: 'json' })
     .$type<string[]>()
     .notNull()
     .default(sql`'[]'`),
 
-  // Self 심리 프로파일 (축소판 Big Five + Attachment + 기타)
-  // 온보딩에서 일부만 채우고 이후 점진 보강
+  // ========== 유저 자가 기술 필드 (온보딩에서 직접 입력) ==========
+  mbti: text('mbti'), // 'ENFP' 등
+  strengths: text('strengths', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  weaknesses: text('weaknesses', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  dealBreakers: text('deal_breakers', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+  idealType: text('ideal_type'),
+  personalityNotes: text('personality_notes'),
+  valuesNotes: text('values_notes'),
+  experienceLevel: text('experience_level'), // 'none' | 'some' | 'experienced' | 'very_experienced'
+
+  // Self 심리 프로파일 (AI 추론 — progressive)
   psychProfile: text('psych_profile', { mode: 'json' })
     .$type<SelfPsychProfile>()
     .notNull()
     .default(sql`'{}'`),
 
-  // 자유 기술 노트 (자기소개, 중요 맥락)
+  // 자유 기술 노트 (기타 중요 맥락)
   notes: text('notes'),
 })
 
@@ -52,10 +70,25 @@ export const targets = sqliteTable('targets', {
 
   alias: text('alias').notNull(), // 상대 호칭 (실명 or 닉네임)
   age: integer('age'),
+  gender: text('gender'), // 'male' | 'female' | 'other'
   job: text('job'),
   matchPlatform: text('match_platform'), // 'tinder' | 'bumble' | 'offline' | 'intro' | ...
   firstContactAt: integer('first_contact_at', { mode: 'timestamp_ms' }),
   avatarEmoji: text('avatar_emoji').default('💭'),
+
+  // ========== 유저가 상대에 대해 가진 배경 정보 ==========
+  mbti: text('mbti'),
+  background: text('background'), // 출신, 학력, 가족, 종교 등
+  commonGround: text('common_ground'), // 나와의 공통점, 접점
+  relationshipHistory: text('relationship_history'), // 상대 과거 연애 추정
+  physicalDescription: text('physical_description'), // 외형/스타일
+  interests: text('interests', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'`),
+
+  // ========== 핵심: 현재 진행 중인 관계 상황 기술 ==========
+  currentSituation: text('current_situation'),
 
   // 현재 관계 단계
   stage: text('stage').notNull().default('matched'),
@@ -165,11 +198,28 @@ export const strategies = sqliteTable('strategies', {
     .$type<StrategyOption[]>()
     .notNull(),
 
+  // 까먹지 않게 AI가 뽑아주는 구체 할 일
+  todos: text('todos', { mode: 'json' })
+    .$type<StrategyTodo[]>()
+    .notNull()
+    .default(sql`'[]'`),
+
   // 유저가 택한 옵션 id (나중 outcome 연결용)
   chosenOptionId: text('chosen_option_id'),
   outcome: text('outcome'), // 'good' | 'bad' | 'neutral' | null
   outcomeNote: text('outcome_note'),
 })
+
+export type StrategyTodo = {
+  id: string
+  text: string // 할 일 내용
+  when: string // "오늘 저녁" / "48시간 안" / "다음 만남 전"
+  priority: 'high' | 'medium' | 'low'
+  done: boolean
+  doneAt?: number
+  // 어느 옵션에서 파생됐는지 (채택 시 자동 추가되는 경우)
+  sourceOptionId?: string
+}
 
 // ============================================================================
 // 타입 정의 (JSON 컬럼들)
@@ -204,10 +254,13 @@ export type SelfPsychProfile = {
     tradition?: _Dim
     selfDirection?: _Dim
   }
-  // 강점 — 연애 운영에서 유저가 잘하는 것
+  // 강점 — 연애 운영에서 유저가 잘하는 것 (자가선언 병합됨)
   strengths?: string[]
   // 약점 — 반복되는 실수, 회피 패턴
   weaknesses?: string[]
+  // AI가 대화 데이터에서 새로 발견했지만 유저가 자가선언 안 한 것 — 제안
+  suggestedStrengths?: string[]
+  suggestedWeaknesses?: string[]
   // 반복 패턴 — "3주차에 모멘텀 잃음" 같은 발견
   patterns?: string[]
   // Playbook — 특정 상대 유형에 어떤 전략이 잘 통했는지
