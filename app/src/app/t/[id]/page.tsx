@@ -52,17 +52,35 @@ export default async function TargetDetailPage({
       </header>
 
       <div className="px-5 flex-1 flex flex-col gap-4 pb-6">
+        {/* Current situation */}
+        {target.currentSituation && (
+          <Card>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-muted">현재 진행 상황</div>
+                <div className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
+                  {target.currentSituation}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Goal card */}
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-xs text-muted">목표</div>
               <div className="mt-1 text-sm font-medium">
-                {target.goal.description}
+                {target.goal?.description ?? '미설정'}
               </div>
               <div className="mt-1 flex items-center gap-2">
-                <Pill tone="accent">{GOAL_LABEL[target.goal.preset]}</Pill>
-                {target.goal.timeframeWeeks != null && (
+                {target.goal?.preset && (
+                  <Pill tone="accent">
+                    {GOAL_LABEL[target.goal.preset] ?? target.goal.preset}
+                  </Pill>
+                )}
+                {target.goal?.timeframeWeeks != null && (
                   <span className="text-xs text-muted">
                     {target.goal.timeframeWeeks}주 내
                   </span>
@@ -77,6 +95,46 @@ export default async function TargetDetailPage({
             </Link>
           </div>
         </Card>
+
+        {/* Background pills */}
+        {(target.mbti ||
+          target.background ||
+          target.commonGround ||
+          target.relationshipHistory ||
+          (target.interests?.length ?? 0) > 0) && (
+          <Card>
+            <div className="text-xs text-muted mb-2">배경</div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {target.mbti && <Pill tone="accent">{target.mbti}</Pill>}
+              {target.gender && (
+                <Pill tone="neutral">
+                  {target.gender === 'female' ? '여' : target.gender === 'male' ? '남' : target.gender}
+                </Pill>
+              )}
+              {(target.interests ?? []).map((it, i) => (
+                <Pill key={i} tone="neutral">
+                  {it}
+                </Pill>
+              ))}
+            </div>
+            {target.background && (
+              <div className="text-xs text-muted mt-2">
+                <span className="text-text">배경:</span> {target.background}
+              </div>
+            )}
+            {target.commonGround && (
+              <div className="text-xs text-muted mt-1">
+                <span className="text-text">접점:</span> {target.commonGround}
+              </div>
+            )}
+            {target.relationshipHistory && (
+              <div className="text-xs text-muted mt-1">
+                <span className="text-text">연애 이력:</span>{' '}
+                {target.relationshipHistory}
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Strategy entry */}
         <Card>

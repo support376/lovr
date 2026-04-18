@@ -19,6 +19,11 @@ export const SYSTEM_BASE = `당신은 LuvOS의 전략 엔진입니다. LuvOS는 
 export function renderDossier(self: Self, target: Target, recentInteractions: Interaction[]) {
   const lines: string[] = []
 
+  const strengths = self.strengths ?? []
+  const weaknesses = self.weaknesses ?? []
+  const dealBreakers = self.dealBreakers ?? []
+  const toneSamples = self.toneSamples ?? []
+
   // ========== Self ==========
   lines.push('## [유저 (Self) 프로파일]')
   lines.push(`- 이름: ${self.displayName}`)
@@ -29,20 +34,20 @@ export function renderDossier(self: Self, target: Target, recentInteractions: In
   if (self.experienceLevel) lines.push(`- 연애 경험: ${self.experienceLevel}`)
   if (self.relationshipGoal) lines.push(`- 전반적 관계 목표: ${self.relationshipGoal}`)
 
-  if (self.strengths.length > 0)
-    lines.push(`- 자가 선언 강점: ${self.strengths.join(' / ')}`)
-  if (self.weaknesses.length > 0)
-    lines.push(`- 자가 선언 약점: ${self.weaknesses.join(' / ')}`)
-  if (self.dealBreakers.length > 0)
-    lines.push(`- 딜 브레이커: ${self.dealBreakers.join(' / ')}`)
+  if (strengths.length > 0)
+    lines.push(`- 자가 선언 강점: ${strengths.join(' / ')}`)
+  if (weaknesses.length > 0)
+    lines.push(`- 자가 선언 약점: ${weaknesses.join(' / ')}`)
+  if (dealBreakers.length > 0)
+    lines.push(`- 딜 브레이커: ${dealBreakers.join(' / ')}`)
   if (self.idealType) lines.push(`- 이상형: ${self.idealType}`)
   if (self.personalityNotes) lines.push(`- 성격: ${self.personalityNotes}`)
   if (self.valuesNotes) lines.push(`- 가치관: ${self.valuesNotes}`)
   if (self.notes) lines.push(`- 기타 메모: ${self.notes}`)
 
-  if (self.toneSamples.length > 0) {
+  if (toneSamples.length > 0) {
     lines.push('- 과거 톤 샘플(legacy):')
-    self.toneSamples.forEach((s, i) => lines.push(`  ${i + 1}. "${s}"`))
+    toneSamples.forEach((s, i) => lines.push(`  ${i + 1}. "${s}"`))
   }
   if (self.psychProfile && Object.keys(self.psychProfile).length > 0) {
     lines.push(`- AI가 추론한 심리 프로파일: ${JSON.stringify(self.psychProfile)}`)
@@ -64,7 +69,8 @@ export function renderDossier(self: Self, target: Target, recentInteractions: In
   if (target.background) lines.push(`- 배경: ${target.background}`)
   if (target.commonGround) lines.push(`- 나와의 접점: ${target.commonGround}`)
   if (target.relationshipHistory) lines.push(`- 상대 연애 이력: ${target.relationshipHistory}`)
-  if (target.interests.length > 0) lines.push(`- 관심사: ${target.interests.join(', ')}`)
+  const targetInterests = target.interests ?? []
+  if (targetInterests.length > 0) lines.push(`- 관심사: ${targetInterests.join(', ')}`)
   if (target.notes) lines.push(`- 메모: ${target.notes}`)
 
   lines.push(`- 현재 단계: ${target.stage}`)
@@ -75,19 +81,28 @@ export function renderDossier(self: Self, target: Target, recentInteractions: In
   }
   lines.push('')
   lines.push(`### [목표]`)
+  const goal = target.goal ?? { preset: 'explore', description: '일단 탐색' }
   lines.push(
-    `${target.goal.description} (preset=${target.goal.preset}${target.goal.timeframeWeeks ? `, ${target.goal.timeframeWeeks}주 내` : ''})`
+    `${goal.description} (preset=${goal.preset}${goal.timeframeWeeks ? `, ${goal.timeframeWeeks}주 내` : ''})`
   )
 
-  if (target.tags.length > 0) lines.push(`- 태그: ${target.tags.join(', ')}`)
+  const targetTags = target.tags ?? []
+  if (targetTags.length > 0) lines.push(`- 태그: ${targetTags.join(', ')}`)
 
   lines.push('')
   lines.push('### [누적 통계]')
+  const stats = target.stats ?? {
+    messageCount: 0,
+    myMessageCount: 0,
+    theirMessageCount: 0,
+    totalChars: 0,
+    lastInteractionAt: null,
+  }
   lines.push(
-    `총 메시지 ${target.stats.messageCount}건 (내 ${target.stats.myMessageCount} / 상대 ${target.stats.theirMessageCount})`
+    `총 메시지 ${stats.messageCount}건 (내 ${stats.myMessageCount} / 상대 ${stats.theirMessageCount})`
   )
-  if (target.stats.avgReplyGapMinutes != null) {
-    lines.push(`평균 답장 간격 ${target.stats.avgReplyGapMinutes}분`)
+  if (stats.avgReplyGapMinutes != null) {
+    lines.push(`평균 답장 간격 ${stats.avgReplyGapMinutes}분`)
   }
 
   const profile = target.profile

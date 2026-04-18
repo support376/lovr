@@ -3,10 +3,16 @@ import type { Target } from '@/lib/db/schema'
 import { Card, Pill, STAGE_LABEL, STAGE_TONE, GOAL_LABEL } from './ui'
 
 export function TargetCard({ target }: { target: Target }) {
-  const last = target.stats.lastInteractionAt
-  const lastStr = last
-    ? relativeTime(last)
-    : '기록 없음'
+  const stats = target.stats ?? {
+    messageCount: 0,
+    myMessageCount: 0,
+    theirMessageCount: 0,
+    totalChars: 0,
+    lastInteractionAt: null,
+  }
+  const goal = target.goal ?? { preset: 'explore', description: '일단 탐색' }
+  const last = stats.lastInteractionAt
+  const lastStr = last ? relativeTime(last) : '기록 없음'
 
   return (
     <Link href={`/t/${target.id}`}>
@@ -23,10 +29,10 @@ export function TargetCard({ target }: { target: Target }) {
               </Pill>
             </div>
             <div className="mt-1 text-xs text-muted truncate">
-              목표: {target.goal.description || GOAL_LABEL[target.goal.preset]}
+              목표: {goal.description || GOAL_LABEL[goal.preset] || '탐색'}
             </div>
             <div className="mt-2 flex items-center gap-3 text-xs text-muted">
-              <span>💬 {target.stats.messageCount}</span>
+              <span>💬 {stats.messageCount}</span>
               <span>·</span>
               <span>{lastStr}</span>
             </div>
