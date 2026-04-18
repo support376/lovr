@@ -52,14 +52,21 @@ type TargetInput = {
   stage?: string
 }
 
-export async function createTarget(input: TargetInput): Promise<Target> {
-  await ensureSchema()
-  const self = await getSelfOrThrow()
+/**
+ * Target 생성.
+ * 에러를 throw하는 대신 { ok, id?, error? } 패턴으로 반환 — 폼이 catch해서 UI에 표시.
+ * Date 객체 serialization 이슈 회피 위해 id만 반환 (Target 객체 전체 반환 X).
+ */
+export async function createTarget(input: TargetInput): Promise<{
+  ok: true
+  id: string
+} | { ok: false; error: string }> {
+  try {
+    await ensureSchema()
+    const self = await getSelfOrThrow()
 
-  const id = randomUUID()
-  const [created] = await db
-    .insert(targets)
-    .values({
+    const id = randomUUID()
+    await db.insert(targets).values({
       id,
       selfId: self.id,
       alias: input.alias,
@@ -89,10 +96,15 @@ export async function createTarget(input: TargetInput): Promise<Target> {
       },
       tags: [],
     })
-    .returning()
 
-  revalidatePath('/')
-  return created
+    revalidatePath('/')
+    return { ok: true, id }
+  } catch (err) {
+    const msg = (err as Error)?.message ?? String(err)
+    const stack = (err as Error)?.stack ?? ''
+    console.error('[createTarget failed]', msg, stack)
+    return { ok: false, error: `${msg}\n${stack.split('\n').slice(0, 5).join('\n')}` }
+  }
 }
 
 export async function updateTargetGoal(

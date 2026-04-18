@@ -64,10 +64,13 @@ export function NewTargetForm() {
   const [timeframe, setTimeframe] = useState('')
   const [notes, setNotes] = useState('')
 
+  const [error, setError] = useState<string | null>(null)
+
   const submit = () => {
     if (!alias.trim()) return
+    setError(null)
     start(async () => {
-      const t = await createTarget({
+      const res = await createTarget({
         alias: alias.trim(),
         age: age ? parseInt(age, 10) : undefined,
         gender: gender || undefined,
@@ -92,7 +95,11 @@ export function NewTargetForm() {
           timeframeWeeks: timeframe ? parseInt(timeframe, 10) : undefined,
         },
       })
-      router.push(`/t/${t.id}`)
+      if (!res.ok) {
+        setError(res.error)
+        return
+      }
+      router.push(`/t/${res.id}`)
     })
   }
 
@@ -350,6 +357,15 @@ export function NewTargetForm() {
             />
           </Card>
         </>
+      )}
+
+      {error && (
+        <Card className="border-bad/40 bg-bad/5">
+          <div className="text-xs font-semibold text-bad mb-1">등록 실패</div>
+          <pre className="text-[11px] text-bad whitespace-pre-wrap break-all">
+            {error}
+          </pre>
+        </Card>
       )}
 
       <div className="flex gap-2 pt-2">
