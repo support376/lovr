@@ -1,0 +1,37 @@
+# deps / build
+node_modules
+dist
+.next
+.vercel
+
+# os / editor
+.DS_Store
+.~lock.*
+
+# env
+.env
+.env.*
+!.env.local.example
+!.env.example
+
+# 로컬 DB
+*.db
+*.db-journal
+
+# 아카이브된 프로토타입 (커밋 안 함)
+_archive_vite_app/
+
+# Circle21 과거 기획·재무·페르소나 문서 (로컬 유지, git 제외)
+*.html
+*.xlsx
+*.pptx
+personas-*.js
+
+# 과거 md 문서 (기획서 v1은 docs/ 에 유지)
+/*.md
+!/README.md
+📖*
+DELIVERY_CHECKLIST.txt
+
+# pitch deck
+pitch-deck/

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(python -m http.server 8080)",
+      "Bash(find . -maxdepth 2 -type f \\\\\\(-name *사업모델* -o -name *비즈니스* -o -name *피벗* -o -name *플라이휠* -o -name *진단흐름* -o -name *전문가*에이전트* -o -name *정밀검토* -o -name REPORT_README* -o -name *pitch* \\\\\\) -printf '%T@ %Tc %p\\\\n')",
+      "WebFetch(domain:closr-topaz.vercel.app)",
+      "Bash(npx vite:*)",
+      "Bash(gh auth:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "WebFetch(domain:lovr-ck8i.vercel.app)",
+      "Bash(node -e \":*)",
+      "Bash(npm run:*)",
+      "WebFetch(domain:lovr-rosy.vercel.app)",
+      "Bash(npx vercel:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:lovr-wheat.vercel.app)",
+      "WebFetch(domain:app-smoky-two.vercel.app)"
+    ]
+  }
+}

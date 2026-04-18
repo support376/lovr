@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0a0a0f;
+  --color-surface: #14141c;
+  --color-surface-2: #1d1d28;
+  --color-border: #2a2a3a;
+  --color-text: #ededf3;
+  --color-muted: #8a8aa0;
+  --color-accent: #ff4d7d;
+  --color-accent-2: #b14dff;
+  --color-good: #4ade80;
+  --color-warn: #facc15;
+  --color-bad: #f87171;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Apple SD Gothic Neo', 'Pretendard',
+    'Malgun Gothic', sans-serif;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* mobile-first viewport */
+  font-size: 15px;
+}
+
+* {
+  -webkit-touch-callout: none;
+}
+
+body {
+  overscroll-behavior-y: none;
+}
+
+/* scrollbar cleanup */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+/* small utility */
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0) + 4.5rem);
+}
