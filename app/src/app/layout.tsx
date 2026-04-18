@@ -14,6 +14,9 @@ export const metadata: Metadata = {
 // Vercel Hobby=10s 고정, Pro=60s까지. 값만 지정하고 플랜이 허용하는 만큼 적용됨.
 export const maxDuration = 60
 
+// 모든 페이지 동적 렌더 (빌드 시 DB 접근 금지)
+export const dynamic = 'force-dynamic'
+
 export const viewport: Viewport = {
   themeColor: '#0a0a0f',
   width: 'device-width',
