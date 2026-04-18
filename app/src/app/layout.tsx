@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { BottomNav } from '@/components/BottomNav'
+import { getOrNullSelf } from '@/lib/actions/self'
 
 export const metadata: Metadata = {
   title: 'LuvOS',
@@ -18,7 +19,10 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const self = await getOrNullSelf().catch(() => null)
+  const showNav = !!self
+
   return (
     <html lang="ko">
       <body className="min-h-screen bg-bg text-text">
@@ -64,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1 flex flex-col overflow-y-auto safe-bottom">
               {children}
             </main>
-            <BottomNav />
+            {showNav && <BottomNav />}
           </div>
         </div>
       </body>

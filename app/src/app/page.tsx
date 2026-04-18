@@ -1,15 +1,15 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { getOrNullSelf } from '@/lib/actions/self'
 import { listTargets } from '@/lib/actions/targets'
 import { TargetCard } from '@/components/TargetCard'
 import { SelfSummaryCard } from '@/components/SelfSummaryCard'
+import { Landing } from '@/components/Landing'
 import { Button, Empty, PageHeader } from '@/components/ui'
 
 export default async function HomePage() {
   const self = await getOrNullSelf()
-  if (!self) redirect('/onboarding')
+  if (!self) return <Landing />
 
   const targets = await listTargets()
   const active = targets.filter((t) => !t.archived)
