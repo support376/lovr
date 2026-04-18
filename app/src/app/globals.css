@@ -48,7 +48,7 @@ body {
   border-radius: 3px;
 }
 
-/* small utility */
+/* safe-bottom은 이제 폰 프레임 안쪽이라 큰 여유 불필요 */
 .safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0) + 4.5rem);
+  padding-bottom: 1rem;
 }

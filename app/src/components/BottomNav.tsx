@@ -14,9 +14,8 @@ export function BottomNav() {
   const pathname = usePathname()
   return (
     <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md
-                 border-t border-border bg-surface/90 backdrop-blur
-                 flex justify-around items-stretch z-50"
+      className="shrink-0 border-t border-border bg-surface/90 backdrop-blur
+                 flex justify-around items-stretch z-40"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
     >
       {items.map(({ href, label, icon: Icon }) => {
