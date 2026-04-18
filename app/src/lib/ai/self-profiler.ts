@@ -336,7 +336,7 @@ export async function updateSelfProfile(self: Self): Promise<SelfPsychProfile> {
     ],
     tool: SELF_TOOL,
     cacheSystem: true,
-    maxTokens: 3000,
+    maxTokens: 2000,
   })
 
   // 7) 병합해서 저장

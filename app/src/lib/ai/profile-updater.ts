@@ -173,7 +173,7 @@ export async function updateTargetProfile(
     ],
     tool: UPDATE_TOOL,
     cacheSystem: true,
-    maxTokens: 2500,
+    maxTokens: 1500,
   })
 
   // 기존 프로파일에 업데이트 병합

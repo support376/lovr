@@ -1,8 +1,10 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
 
-export const MODEL = 'claude-sonnet-4-6'
+// Vercel Hobby 플랜의 함수 10초 제한 때문에 Haiku를 기본으로. Pro로 올라가면 Sonnet 전환 권장.
+export const MODEL = 'claude-haiku-4-5-20251001'
 export const FAST_MODEL = 'claude-haiku-4-5-20251001'
+export const DEEP_MODEL = 'claude-sonnet-4-6' // 추후 옵션 제공용
 
 let _client: Anthropic | null = null
 

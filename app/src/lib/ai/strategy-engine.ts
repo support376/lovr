@@ -249,7 +249,7 @@ ${extras}
     ],
     tool: STRATEGY_TOOL,
     cacheSystem: true,
-    maxTokens: 3500,
+    maxTokens: 2500,
   })
 
   const options: StrategyOption[] = result.options.map((o) => ({

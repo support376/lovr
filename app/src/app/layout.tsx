@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 }
 
+// LLM 호출하는 server action 위해 함수 타임아웃 늘림.
+// Vercel Hobby=10s 고정, Pro=60s까지. 값만 지정하고 플랜이 허용하는 만큼 적용됨.
+export const maxDuration = 60
+
 export const viewport: Viewport = {
   themeColor: '#0a0a0f',
   width: 'device-width',

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { bestEffortProfileSelf, createSelf } from '@/lib/actions/self'
+import { createSelf } from '@/lib/actions/self'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import { X } from 'lucide-react'
 
@@ -36,32 +36,34 @@ export function OnboardingForm() {
   const [personalityNotes, setPersonalityNotes] = useState('')
   const [valuesNotes, setValuesNotes] = useState('')
 
-  const [profiling, setProfiling] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   const router = useRouter()
 
   const submit = () => {
     if (!name.trim()) return
+    setError(null)
     start(async () => {
-      await createSelf({
-        displayName: name.trim(),
-        age: age ? parseInt(age, 10) : undefined,
-        gender: gender || undefined,
-        orientation: orientation || undefined,
-        relationshipGoal: goal,
-        mbti: mbti || undefined,
-        strengths,
-        weaknesses,
-        dealBreakers,
-        idealType: idealType || undefined,
-        personalityNotes: personalityNotes || undefined,
-        valuesNotes: valuesNotes || undefined,
-        experienceLevel: experienceLevel || undefined,
-      })
-      setProfiling(true)
-      await bestEffortProfileSelf()
-      setProfiling(false)
-      router.push('/')
+      try {
+        await createSelf({
+          displayName: name.trim(),
+          age: age ? parseInt(age, 10) : undefined,
+          gender: gender || undefined,
+          orientation: orientation || undefined,
+          relationshipGoal: goal,
+          mbti: mbti || undefined,
+          strengths,
+          weaknesses,
+          dealBreakers,
+          idealType: idealType || undefined,
+          personalityNotes: personalityNotes || undefined,
+          valuesNotes: valuesNotes || undefined,
+          experienceLevel: experienceLevel || undefined,
+        })
+        router.push('/')
+      } catch (e) {
+        setError((e as Error).message || '저장 실패')
+      }
     })
   }
 
@@ -254,6 +256,12 @@ export function OnboardingForm() {
         </>
       )}
 
+      {error && (
+        <Card className="border-bad/40 bg-bad/5">
+          <div className="text-sm text-bad">{error}</div>
+        </Card>
+      )}
+
       <div className="flex gap-2 pt-2">
         {step > 1 && (
           <Button
@@ -270,15 +278,15 @@ export function OnboardingForm() {
           disabled={(step === 1 && !name.trim()) || pending}
           className="flex-1"
         >
-          {profiling
-            ? 'AI가 너를 프로파일링…'
-            : pending
-            ? '저장 중…'
-            : step === 3
-            ? '시작하기'
-            : '다음'}
+          {pending ? '저장 중…' : step === 3 ? '시작하기' : '다음'}
         </Button>
       </div>
+
+      {step === 3 && !error && (
+        <div className="text-center text-[11px] text-muted/70">
+          저장하면 홈으로. AI 프로파일링은 "나" 탭에서 수동으로 돌릴 수 있어.
+        </div>
+      )}
     </form>
   )
 }
