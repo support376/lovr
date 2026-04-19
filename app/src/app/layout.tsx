@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { BottomNav } from '@/components/BottomNav'
-import { getOrNullSelf } from '@/lib/actions/self'
+import { TopBar } from '@/components/TopBar'
+import { getSelf } from '@/lib/actions/self'
 
 export const metadata: Metadata = {
   title: 'LuvOS',
@@ -27,7 +28,7 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const self = await getOrNullSelf().catch(() => null)
+  const self = await getSelf().catch(() => null)
   const showNav = !!self
 
   return (
@@ -58,10 +59,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </aside>
 
-          {/* 폰 프레임 */}
+          {/* 폰 프레임 — 모바일은 동적 뷰포트 높이로 고정. BottomNav가 절대 밀리지 않게. */}
           <div
             className="relative w-full md:w-[420px]
-                       min-h-screen md:min-h-0 md:h-[860px] md:max-h-[90vh]
+                       h-[100dvh] md:h-[860px] md:max-h-[90vh]
                        bg-bg flex flex-col overflow-hidden
                        md:rounded-[2.5rem] md:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)]
                        md:ring-1 md:ring-border md:border-[12px] md:border-[#0f0f15]"
@@ -72,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                          w-24 h-6 bg-[#0f0f15] rounded-b-2xl z-50"
               aria-hidden="true"
             />
+            {showNav && <TopBar />}
             <main className="flex-1 flex flex-col overflow-y-auto safe-bottom">
               {children}
             </main>

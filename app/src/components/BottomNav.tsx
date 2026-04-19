@@ -1,26 +1,41 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Users, Settings } from 'lucide-react'
+import { Sparkles, Heart, Pencil, Settings } from 'lucide-react'
 import clsx from 'clsx'
 
 const items = [
-  { href: '/', label: '홈', icon: Home },
-  { href: '/targets', label: '상대', icon: Users },
-  { href: '/me', label: '나', icon: Settings },
+  { href: '/', label: 'LuvAI', icon: Sparkles, match: (p: string) => p === '/' },
+  {
+    href: '/r',
+    label: '관계',
+    icon: Heart,
+    match: (p: string) => p === '/r' || p.startsWith('/r/'),
+  },
+  {
+    href: '/timeline',
+    label: '기록',
+    icon: Pencil,
+    match: (p: string) => p.startsWith('/timeline'),
+  },
+  {
+    href: '/me',
+    label: '설정',
+    icon: Settings,
+    match: (p: string) => p.startsWith('/me'),
+  },
 ]
 
 export function BottomNav() {
-  const pathname = usePathname()
+  const pathname = usePathname() ?? '/'
   return (
     <nav
       className="shrink-0 border-t border-border bg-surface/90 backdrop-blur
                  flex justify-around items-stretch z-40"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
     >
-      {items.map(({ href, label, icon: Icon }) => {
-        const active =
-          href === '/' ? pathname === '/' : pathname.startsWith(href)
+      {items.map(({ href, label, icon: Icon, match }) => {
+        const active = match(pathname)
         return (
           <Link
             key={href}

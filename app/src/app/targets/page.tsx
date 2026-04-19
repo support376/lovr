@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
-export default function TargetsIndex() {
-  redirect('/')
+export default function Targets() {
+  redirect('/timeline')
 }
