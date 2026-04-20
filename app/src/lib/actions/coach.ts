@@ -42,9 +42,16 @@ export async function recordManualOutcomeAction(input: {
   narrative: string
   goalProgress: 'advanced' | 'stagnant' | 'regressed' | 'unclear'
 }) {
-  const res = await engine.recordManualOutcome(input)
-  revalidatePath('/')
-  return res
+  try {
+    const res = await engine.recordManualOutcome(input)
+    revalidatePath('/')
+    return res
+  } catch (e) {
+    console.error('[recordManualOutcomeAction]', e)
+    throw new Error(
+      `결과 저장 실패: ${(e as Error).message ?? 'unknown'}`
+    )
+  }
 }
 
 export async function generateWeeklyReportAction(relationshipId: string) {

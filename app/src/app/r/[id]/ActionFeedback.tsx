@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, X, MessageSquare } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import {
   markActionCancelledAction,
   markActionExecutedAction,
@@ -11,18 +11,21 @@ import {
 
 type Progress = 'advanced' | 'stagnant' | 'regressed' | 'unclear'
 
-const PROGRESS_OPTIONS: Array<{ v: Progress; l: string; tone: string }> = [
-  { v: 'advanced', l: '진전', tone: 'text-good' },
-  { v: 'stagnant', l: '정체', tone: 'text-muted' },
-  { v: 'regressed', l: '후퇴', tone: 'text-bad' },
-  { v: 'unclear', l: '불명', tone: 'text-muted' },
+const PROGRESS_OPTIONS: Array<{ v: Progress; l: string }> = [
+  { v: 'advanced', l: '진전' },
+  { v: 'stagnant', l: '정체' },
+  { v: 'regressed', l: '후퇴' },
+  { v: 'unclear', l: '불명' },
 ]
 
 /**
- * Action closed-loop 3버튼.
- * - 했음: executed 처리 (outcome 은 선택적으로 나중에)
- * - 안 했음: cancelled 처리
- * - 결과: 진행도 + narrative 입력 → outcome 기록
+ * Action closed-loop.
+ *
+ * 플로우 단순화:
+ *   1) 미정 → [ 했음 ] [ 안 했음 ] 2버튼
+ *   2) '했음' 클릭 → 결과 입력 폼 (진행도 + narrative). '나중에' 로 스킵 가능.
+ *   3) '안 했음' → 즉시 cancelled.
+ *   4) settled 상태는 요약 한 줄 + 결과 기록 추가 링크.
  */
 export function ActionFeedback({
   actionId,
@@ -33,17 +36,14 @@ export function ActionFeedback({
   status: string
   hasOutcome: boolean
 }) {
+  const router = useRouter()
+  const [pending, start] = useTransition()
+  const [err, setErr] = useState<string | null>(null)
   const [mode, setMode] = useState<'idle' | 'outcome'>('idle')
   const [progress, setProgress] = useState<Progress>('advanced')
   const [narrative, setNarrative] = useState('')
-  const [pending, start] = useTransition()
-  const [err, setErr] = useState<string | null>(null)
-  const router = useRouter()
 
-  const settled =
-    status === 'executed' || status === 'cancelled' || hasOutcome
-
-  const done = (fn: () => Promise<unknown>) => {
+  const run = (fn: () => Promise<unknown>) => {
     setErr(null)
     start(async () => {
       try {
@@ -52,15 +52,31 @@ export function ActionFeedback({
         setNarrative('')
         router.refresh()
       } catch (e) {
-        setErr((e as Error).message)
+        console.error('[ActionFeedback]', e)
+        setErr((e as Error).message || '저장 실패')
       }
     })
   }
 
+  const executed = status === 'executed'
+  const cancelled = status === 'cancelled'
+  const settled = executed || cancelled || hasOutcome
+
+  // ── 결과 입력 폼 ────────────────────────────────
   if (mode === 'outcome') {
     return (
       <div className="flex flex-col gap-2 p-3 rounded-xl border border-accent/30 bg-accent/5">
-        <div className="text-xs text-muted">결과 기록</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-accent">결과 기록</div>
+          <button
+            type="button"
+            onClick={() => setMode('idle')}
+            disabled={pending}
+            className="text-[11px] text-muted hover:text-accent"
+          >
+            닫기
+          </button>
+        </div>
         <div className="flex gap-1.5 flex-wrap">
           {PROGRESS_OPTIONS.map((p) => (
             <button
@@ -86,24 +102,24 @@ export function ActionFeedback({
           className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-none"
         />
         {err && (
-          <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2">
+          <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2 whitespace-pre-wrap">
             {err}
           </div>
         )}
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setMode('idle')}
+            onClick={() => run(() => markActionExecutedAction(actionId))}
             disabled={pending}
-            className="flex-1 py-2 text-xs rounded-lg border border-border text-muted"
+            className="flex-1 py-2 text-xs rounded-lg border border-border text-muted disabled:opacity-60"
           >
-            취소
+            나중에
           </button>
           <button
             type="button"
             disabled={pending || !narrative.trim()}
             onClick={() =>
-              done(() =>
+              run(() =>
                 recordManualOutcomeAction({
                   actionId,
                   narrative: narrative.trim(),
@@ -120,21 +136,17 @@ export function ActionFeedback({
     )
   }
 
+  // ── settled 요약 ────────────────────────────────
   if (settled) {
-    const badge =
-      status === 'executed' && hasOutcome
-        ? '실행 + 결과 기록됨'
-        : status === 'executed'
-        ? '실행됨 · 결과 미기록'
-        : status === 'cancelled'
-        ? '안 함'
-        : hasOutcome
-        ? '결과 기록됨'
-        : '완료'
+    const label = cancelled
+      ? '안 함'
+      : hasOutcome
+      ? '실행 + 결과 기록됨'
+      : '실행됨 · 결과 미기록'
     return (
-      <div className="flex items-center gap-2 text-[11px] text-muted">
-        <span>· {badge}</span>
-        {!hasOutcome && status === 'executed' && (
+      <div className="flex items-center justify-between text-[11px] text-muted px-1">
+        <span>· {label}</span>
+        {executed && !hasOutcome && (
           <button
             type="button"
             onClick={() => setMode('outcome')}
@@ -147,13 +159,14 @@ export function ActionFeedback({
     )
   }
 
+  // ── 초기 2버튼 ──────────────────────────────────
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-[11px] text-muted">실행했어?</div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="text-[11px] text-muted px-1">실행했어?</div>
+      <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => done(() => markActionExecutedAction(actionId))}
+          onClick={() => setMode('outcome')}
           disabled={pending}
           className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-good/40 bg-good/5 text-good text-xs font-semibold hover:bg-good/10 disabled:opacity-60"
         >
@@ -161,23 +174,15 @@ export function ActionFeedback({
         </button>
         <button
           type="button"
-          onClick={() => done(() => markActionCancelledAction(actionId))}
+          onClick={() => run(() => markActionCancelledAction(actionId))}
           disabled={pending}
           className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-border bg-surface-2 text-muted text-xs font-semibold hover:bg-surface-3 disabled:opacity-60"
         >
           <X size={14} /> 안 했음
         </button>
-        <button
-          type="button"
-          onClick={() => setMode('outcome')}
-          disabled={pending}
-          className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-accent/40 bg-accent/5 text-accent text-xs font-semibold hover:bg-accent/10 disabled:opacity-60"
-        >
-          <MessageSquare size={14} /> 결과
-        </button>
       </div>
       {err && (
-        <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2">
+        <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2 whitespace-pre-wrap">
           {err}
         </div>
       )}
