@@ -103,7 +103,7 @@ export async function updateRelationship(
   patch: Partial<Pick<Relationship,
     'description' | 'style' | 'progress' | 'exclusivity' | 'conflictState' |
     'powerBalance' | 'communicationPattern' | 'investmentAsymmetry' |
-    'escalationSpeed' | 'status'
+    'escalationSpeed' | 'status' | 'timelineStart'
   >>
 ): Promise<void> {
   try {

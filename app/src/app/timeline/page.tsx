@@ -12,6 +12,7 @@ import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
 import { PartnerInlineEditor } from '@/app/r/[id]/PartnerInlineEditor'
+import { SelfSummaryPanel } from './SelfSummaryPanel'
 
 export default async function TimelinePage({
   searchParams,
@@ -32,11 +33,7 @@ export default async function TimelinePage({
     <>
       <PageHeader
         title="기록"
-        subtitle={
-          focused
-            ? '상대 정보 · 대화 · 메모 전부 여기서'
-            : '먼저 관계를 등록해야 Event를 쌓을 수 있어'
-        }
+        subtitle="상대 · 나 · 대화 · 메모 전부 여기서"
         right={
           <Link
             href="/r/new"
@@ -48,11 +45,14 @@ export default async function TimelinePage({
         }
       />
 
-      <div className="px-5 pb-10 flex-1 flex flex-col gap-5">
+      <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
+        {/* Self 는 관계 유무 무관 항상 노출 */}
+        <SelfSummaryPanel self={self} />
+
         {!focused ? (
           <Empty
             title="등록된 관계 없음"
-            subtitle="관계를 추가하면 여기서 상대 정보 · 대화 · 메모를 쌓을 수 있어."
+            subtitle="관계를 추가하면 상대 프로필 · 대화 · 메모를 여기서 쌓을 수 있어."
             action={
               <Link href="/r/new">
                 <Button>첫 관계 등록</Button>
@@ -79,7 +79,6 @@ export default async function TimelinePage({
               </div>
             )}
 
-            {/* 상대 프로필 — 접힘 기본. 입력 UI 는 모두 여기 */}
             <PartnerInlineEditor rel={focused} showToggleButton={true} />
 
             <AddEventForm relationshipId={focused.id} />

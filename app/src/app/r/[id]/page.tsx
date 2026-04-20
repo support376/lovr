@@ -9,6 +9,7 @@ import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
 import { StagePicker } from './StagePicker'
 import { GoalPicker } from './GoalPicker'
+import { NarrativeCard } from './NarrativeCard'
 
 export default async function RelationshipPage({
   params,
@@ -89,8 +90,10 @@ export default async function RelationshipPage({
         </div>
       </div>
 
-      {/* 행동 영역 — 이 화면의 주 콘텐츠 */}
       <div className="px-5 pb-10 flex-1 flex flex-col gap-3">
+        {/* 현재 상태 해석 — 언제부터 · 지금 OO 단계 · 전략 OO */}
+        <NarrativeCard rel={rel} primaryGoal={primaryGoal} />
+
         {!latestAction && (
           <QuickActionCTA
             relationshipId={id}

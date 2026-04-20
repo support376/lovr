@@ -23,9 +23,20 @@ const MBTI_AXES = [
   { axis: 3, left: 'J', right: 'P' },
 ]
 
+function dateInputValue(ts: number | Date | null | undefined): string {
+  if (!ts) return ''
+  const d = ts instanceof Date ? ts : new Date(Number(ts))
+  if (isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
 /**
- * 관계 탭 헤더 옆 "상세" 버튼으로 열리는 인라인 편집.
- * 파트너 개인정보 전용. 관계 stage 는 메인 StagePicker 로 분리.
+ * Target 프로필 카드 — 항상 보이는 summary + 탭 접힘 상세 편집.
+ *   summary = 이름 · 나이 · MBTI · 직업 · 첫 만남 · 제약 태그
+ *   편집 시 전체 폼 (name/age/gender/occupation/mbti/timelineStart/description/rawNotes/constraints)
  */
 export function PartnerInlineEditor({
   rel,
@@ -53,16 +64,22 @@ export function PartnerInlineEditor({
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
   const [mbti, setMbti] = useState(rel.partner.mbti ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
+  const [constraintsText, setConstraintsText] = useState(
+    (rel.partner.knownConstraints ?? []).join(', ')
+  )
 
-  // Relationship fields (partner 맥락 1줄)
+  // Relationship fields
   const [description, setDescription] = useState(rel.description ?? '')
+  const [firstMet, setFirstMet] = useState(dateInputValue(rel.timelineStart))
 
   const submit = () => {
     setMsg(null)
     start(async () => {
       try {
+        const timelineStart = firstMet ? new Date(firstMet + 'T00:00:00') : null
         await updateRelationship(rel.id, {
           description: description.trim() || null,
+          timelineStart,
         } as never)
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
@@ -71,6 +88,10 @@ export function PartnerInlineEditor({
           occupation: occupation.trim() || null,
           mbti: mbti || null,
           rawNotes: rawNotes.trim() || null,
+          knownConstraints: constraintsText
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
         })
         setMsg('저장됨')
         setOpen(false)
@@ -81,11 +102,59 @@ export function PartnerInlineEditor({
     })
   }
 
+  // ── Summary (항상 보이는 한줄 요약) ──
+  const firstMetDisplay = rel.timelineStart
+    ? new Date(
+        rel.timelineStart instanceof Date
+          ? rel.timelineStart
+          : Number(rel.timelineStart)
+      ).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    : null
+  const constraintList = rel.partner.knownConstraints ?? []
+
+  const summary = (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-base font-bold">{rel.partner.displayName}</span>
+        {rel.partner.age && (
+          <span className="text-sm text-muted font-medium">
+            {rel.partner.age}
+          </span>
+        )}
+        {rel.partner.mbti && (
+          <span className="text-[11px] font-mono text-accent bg-accent/10 rounded px-1.5 py-0.5">
+            {rel.partner.mbti}
+          </span>
+        )}
+        {rel.partner.occupation && (
+          <span className="text-[11px] text-muted">
+            · {rel.partner.occupation}
+          </span>
+        )}
+      </div>
+      {(firstMetDisplay || constraintList.length > 0 || rel.description) && (
+        <div className="flex flex-col gap-0.5 text-[11px] text-muted leading-relaxed">
+          {firstMetDisplay && <div>📅 첫 만남 {firstMetDisplay}</div>}
+          {rel.description && (
+            <div className="whitespace-pre-wrap">💬 {rel.description}</div>
+          )}
+          {constraintList.length > 0 && (
+            <div>🏷 {constraintList.join(' · ')}</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+
+  // ── Form body (접힘 시 숨김) ──
   const body = (
-    <div className="mt-3 flex flex-col gap-3">
-      {/* 이름 */}
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">이름</span>
+        <span className="text-[10px] text-muted uppercase tracking-wider">이름</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -95,7 +164,7 @@ export function PartnerInlineEditor({
 
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">나이</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">나이</span>
           <input
             value={age}
             onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, ''))}
@@ -105,7 +174,7 @@ export function PartnerInlineEditor({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">성별</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">성별</span>
           <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
@@ -119,7 +188,7 @@ export function PartnerInlineEditor({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">직업</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">직업</span>
           <input
             value={occupation}
             onChange={(e) => setOccupation(e.target.value)}
@@ -131,7 +200,7 @@ export function PartnerInlineEditor({
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted">MBTI</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">MBTI</span>
           <span className="text-sm font-mono text-accent">
             {mbti || '? ? ? ?'}
           </span>
@@ -175,7 +244,21 @@ export function PartnerInlineEditor({
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">관계 정의 (한 줄)</span>
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          첫 만남 날짜
+        </span>
+        <input
+          type="date"
+          value={firstMet}
+          onChange={(e) => setFirstMet(e.target.value)}
+          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          관계 정의 (한 줄)
+        </span>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -184,9 +267,21 @@ export function PartnerInlineEditor({
         />
       </label>
 
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          제약 · 맥락 태그 (쉼표)
+        </span>
+        <input
+          value={constraintsText}
+          onChange={(e) => setConstraintsText(e.target.value)}
+          placeholder="기혼, 직장 동료, 연하"
+          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
+        />
+      </label>
+
       <TextArea
         label="상대 메모"
-        rows={4}
+        rows={5}
         value={rawNotes}
         onChange={(e) => setRawNotes(e.target.value)}
         placeholder="배경·성격·취향·공통 접점·과거 이력"
@@ -201,16 +296,22 @@ export function PartnerInlineEditor({
   )
 
   if (!showToggleButton) {
-    return open ? <Card>{body}</Card> : null
+    return open ? (
+      <Card>
+        {summary}
+        {body}
+      </Card>
+    ) : null
   }
 
   return (
     <Card>
+      {summary}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full text-left text-xs text-muted uppercase tracking-wider"
+        className="mt-3 w-full text-left text-[11px] text-accent hover:underline"
       >
-        상세 정보 {open ? '▲' : '▼'}
+        {open ? '접기 ▲' : '편집 ▼'}
       </button>
       {open && body}
     </Card>
