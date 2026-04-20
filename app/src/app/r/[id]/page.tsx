@@ -5,7 +5,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
-import { actions as actionsTbl, goals, outcomes } from '@/lib/db/schema'
+import { actions as actionsTbl, goals, insights, outcomes } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
 import { Card, Pill } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
@@ -58,6 +58,17 @@ export default async function RelationshipPage({
     ? await db.select().from(outcomes).where(eq(outcomes.actionId, latestAction.id))
     : []
   const hasOutcome = outs.length > 0
+
+  // active Insight — 이 관계 특정 + self/partner 공통 패턴
+  const activeInsights = await db
+    .select()
+    .from(insights)
+    .where(eq(insights.status, 'active'))
+    .orderBy(desc(insights.createdAt))
+    .limit(8)
+  const relevantInsights = activeInsights.filter(
+    (i) => !i.relationshipId || i.relationshipId === id
+  )
 
   const stageLabel =
     rel.progress && STAGES[rel.progress as keyof typeof STAGES]
@@ -188,7 +199,28 @@ export default async function RelationshipPage({
           </div>
         </details>
 
-        {/* 3. 다면 관계 리포트 */}
+        {/* 3. 주간 Insight — 최근 active */}
+        {relevantInsights.length > 0 && (
+          <section>
+            <div className="text-xs text-muted mb-1.5 flex items-center justify-between">
+              <span>누적 Insight · 주간 리포트에서 뽑힘</span>
+              <Link href={`/r/${id}/report`} className="text-[11px] text-accent">
+                다시 생성 →
+              </Link>
+            </div>
+            <Card>
+              <ul className="flex flex-col gap-1.5">
+                {relevantInsights.slice(0, 5).map((i) => (
+                  <li key={i.id} className="text-xs leading-relaxed">
+                    <span className="text-muted">[{i.scope.replace('_', ' ')}]</span> {i.observation}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        )}
+
+        {/* 4. 다면 관계 리포트 */}
         <section>
           <Link href={`/r/${id}/report`}>
             <Card className="border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors">

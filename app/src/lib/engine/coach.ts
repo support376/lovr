@@ -162,7 +162,8 @@ export async function analyzeOutcome(actionId: string): Promise<{
     ? afterEvents
         .map((e) => {
           const ts = e.timestamp instanceof Date ? e.timestamp : new Date(Number(e.timestamp))
-          return `### [${e.type}] ${ts.toISOString()}\n${e.content}`
+          const whyBlock = e.selfNote ? `\n**Why:** ${e.selfNote}` : ''
+          return `### [${e.type}] ${ts.toISOString()}\n**Fact:**\n${e.content}${whyBlock}`
         })
         .join('\n\n')
     : '(실행 후 이벤트 없음)'
@@ -304,7 +305,8 @@ function formatEvents(list: Array<typeof events.$inferSelect>): string {
   return list
     .map((e) => {
       const ts = e.timestamp instanceof Date ? e.timestamp : new Date(Number(e.timestamp))
-      return `### [${e.type}] ${ts.toISOString()}\n${e.content}`
+      const whyBlock = e.selfNote ? `\n**Why:** ${e.selfNote}` : ''
+      return `### [${e.type}] ${ts.toISOString()}\n**Fact:**\n${e.content}${whyBlock}`
     })
     .join('\n\n')
 }

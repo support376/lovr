@@ -8,20 +8,13 @@ import {
   updateRelationship,
 } from '@/lib/actions/relationships'
 import { STAGES, STAGE_ORDER } from '@/lib/ontology'
-import type { Actor, Relationship } from '@/lib/db/schema'
+import type { Actor, InferredTrait, Relationship } from '@/lib/db/schema'
 
 const GENDER_OPTIONS = [
   { v: '', l: '-' },
   { v: 'male', l: '남' },
   { v: 'female', l: '여' },
   { v: 'other', l: '기타' },
-]
-
-const MBTI_AXES = [
-  { axis: 0, left: 'E', right: 'I' },
-  { axis: 1, left: 'N', right: 'S' },
-  { axis: 2, left: 'T', right: 'F' },
-  { axis: 3, left: 'J', right: 'P' },
 ]
 
 /**
@@ -84,8 +77,27 @@ export function PartnerInlineEditor({
     })
   }
 
+  const traits: InferredTrait[] = rel.partner.inferredTraits ?? []
+
   const body = (
     <div className="mt-3 flex flex-col gap-3">
+      {/* 역프로파일링 요약 — Event에서 자동 추출. 읽기 전용. */}
+      {traits.length > 0 && (
+        <div className="rounded-lg bg-accent/5 border border-accent/20 p-2.5">
+          <div className="text-[10px] text-accent uppercase tracking-wider mb-1.5">
+            관찰 누적 · Event에서 추출
+          </div>
+          <ul className="flex flex-col gap-1">
+            {traits.map((t, i) => (
+              <li key={i} className="text-xs leading-relaxed">
+                • {t.observation}
+                <span className="text-muted ml-1">({t.confidenceNarrative})</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* 이름 */}
       <label className="flex flex-col gap-1">
         <span className="text-[10px] text-muted">이름</span>
@@ -132,50 +144,16 @@ export function PartnerInlineEditor({
         </label>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted">MBTI</span>
-          <span className="text-sm font-mono text-accent">
-            {mbti || '? ? ? ?'}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {MBTI_AXES.map((ax) => {
-            const curChar = mbti[ax.axis] ?? ' '
-            const setAxis = (ch: string) => {
-              const chars = mbti.padEnd(4, ' ').split('')
-              chars[ax.axis] = ch === chars[ax.axis] ? ' ' : ch
-              setMbti(chars.join('').trim() === '' ? '' : chars.join(''))
-            }
-            return (
-              <div key={ax.axis} className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setAxis(ax.left)}
-                  className={`flex-1 py-1.5 rounded-md text-xs font-mono border ${
-                    curChar === ax.left
-                      ? 'bg-accent/15 border-accent text-accent'
-                      : 'bg-surface-2 border-border text-muted'
-                  }`}
-                >
-                  {ax.left}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAxis(ax.right)}
-                  className={`flex-1 py-1.5 rounded-md text-xs font-mono border ${
-                    curChar === ax.right
-                      ? 'bg-accent/15 border-accent text-accent'
-                      : 'bg-surface-2 border-border text-muted'
-                  }`}
-                >
-                  {ax.right}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      {/* MBTI는 단순 텍스트 (상대가 직접 알려준 경우만). 자가진단 토글 X. */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-muted">MBTI (상대가 알려준 경우만)</span>
+        <input
+          value={mbti}
+          onChange={(e) => setMbti(e.target.value.toUpperCase().slice(0, 4))}
+          placeholder="예) ENFP"
+          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm font-mono outline-none focus:border-accent"
+        />
+      </label>
 
       <label className="flex flex-col gap-1">
         <span className="text-[10px] text-muted">관계 단계</span>

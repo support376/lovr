@@ -20,32 +20,35 @@ function toLocalDate(ts: number): string {
 export function AddEventForm({ relationshipId }: { relationshipId: string }) {
   const [type, setType] = useState<EventType>('message')
   const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  const [fact, setFact] = useState('')
+  const [why, setWhy] = useState('')
   const [dateStr, setDateStr] = useState(toLocalDate(Date.now()))
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
   const submit = () => {
-    if (!title.trim() && !content.trim()) return
+    if (!title.trim() && !fact.trim()) return
     setErr(null)
     const ts = new Date(dateStr + 'T12:00').getTime()
-    // 제목이 있으면 content 맨 앞에 합침
+    // Fact = 사실(원문/메모). 제목이 있으면 본문 맨 앞에 붙임.
     const finalContent = title.trim()
-      ? content.trim()
-        ? `**${title.trim()}**\n\n${content.trim()}`
+      ? fact.trim()
+        ? `**${title.trim()}**\n\n${fact.trim()}`
         : `**${title.trim()}**`
-      : content.trim()
+      : fact.trim()
     start(async () => {
       try {
         await addEvent({
           relationshipId,
           type,
           content: finalContent,
+          selfNote: why.trim() || undefined,
           timestamp: ts,
         })
         setTitle('')
-        setContent('')
+        setFact('')
+        setWhy('')
         router.refresh()
       } catch (e) {
         setErr((e as Error).message)
@@ -90,14 +93,29 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
           />
         </div>
 
-        {/* 본문 (선택) */}
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={4}
-          placeholder="내용 (선택 · 카톡 원문·상세)"
-          className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y min-h-[80px]"
-        />
+        {/* 사실 (Fact) */}
+        <div className="flex flex-col gap-1">
+          <div className="text-[11px] text-muted px-0.5">사실 · 무슨 일이 있었나 (원문·메모 그대로)</div>
+          <textarea
+            value={fact}
+            onChange={(e) => setFact(e.target.value)}
+            rows={4}
+            placeholder="예) 카톡 원문 붙여넣기 · 만남 메모 · 전화 녹취 요약"
+            className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y min-h-[80px]"
+          />
+        </div>
+
+        {/* 왜 (Why) · 선택 */}
+        <div className="flex flex-col gap-1">
+          <div className="text-[11px] text-muted px-0.5">왜 · 너의 해석·맥락 (선택)</div>
+          <textarea
+            value={why}
+            onChange={(e) => setWhy(e.target.value)}
+            rows={2}
+            placeholder="예) 내가 먼저 던졌는데 읽고 3시간 만에 답장 → 관심 식은 듯"
+            className="rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y min-h-[56px]"
+          />
+        </div>
 
         {err && (
           <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg px-3 py-2">
@@ -105,7 +123,7 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
           </div>
         )}
 
-        <Button onClick={submit} disabled={pending || (!title.trim() && !content.trim())}>
+        <Button onClick={submit} disabled={pending || (!title.trim() && !fact.trim())}>
           {pending ? '저장 중…' : '저장'}
         </Button>
       </div>

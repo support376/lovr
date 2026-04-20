@@ -12,6 +12,34 @@ import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 // ============================================================================
+// User — 로그인 계정. Auth.js 세션과 매핑.
+// ⚠ 현재는 신설 테이블만 있고 데이터 레이어는 아직 userId로 파티셔닝하지 않음.
+// 로그인 활성화 + per-user Turso DB 전환 시 FK 연결 예정.
+// ============================================================================
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+
+  email: text('email').notNull().unique(),
+  provider: text('provider').notNull(), // 'google' | 'kakao' | …
+  providerAccountId: text('provider_account_id').notNull(),
+  displayName: text('display_name'),
+  imageUrl: text('image_url'),
+
+  /** 이 유저가 매핑된 self Actor id. 온보딩 완료 시 연결. */
+  selfActorId: text('self_actor_id'),
+
+  /** per-user Turso DB url (2단계에서 활용). null이면 공용 DB. */
+  tursoDbUrl: text('turso_db_url'),
+  tursoAuthToken: text('turso_auth_token'),
+})
+
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
+
+// ============================================================================
 // Actor — 사람. self 1명 고정 + partner N명.
 // ============================================================================
 export const actors = sqliteTable('actors', {

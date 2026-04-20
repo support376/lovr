@@ -1,20 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Sparkles, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import { updateSelf } from '@/lib/actions/self'
-import type { Actor } from '@/lib/db/schema'
+import type { Actor, InferredTrait } from '@/lib/db/schema'
 
-// MBTI 4축 토글. 각 축 미선택 시 빈 공간("?")로 노출.
-const MBTI_AXES: Array<{ axis: number; left: string; right: string; leftLabel: string; rightLabel: string }> = [
-  { axis: 0, left: 'E', right: 'I', leftLabel: '외향 E', rightLabel: '내향 I' },
-  { axis: 1, left: 'N', right: 'S', leftLabel: '직관 N', rightLabel: '감각 S' },
-  { axis: 2, left: 'T', right: 'F', leftLabel: '사고 T', rightLabel: '감정 F' },
-  { axis: 3, left: 'J', right: 'P', leftLabel: '판단 J', rightLabel: '인식 P' },
-]
 const GENDER = [
   { v: 'male', l: '남' },
   { v: 'female', l: '여' },
@@ -22,18 +14,17 @@ const GENDER = [
 ]
 
 /**
- * 요약 중심 폼. 세분 필드(personalityNotes/valuesNotes/idealTypeNotes)는
- * 설문으로만 채워지고 여기선 합친 자연어 "내 요약" 박스로만 편집.
- * 저장 시 summary 전체를 personalityNotes 에 몰아넣고 나머지는 비움.
+ * 자가진단 X · 사실(Fact) + 요약 + 딜브레이커만 직접 입력.
+ * 성격/가치관/이상형은 사용자가 자유 서술. MBTI·설문 토글 제거.
+ * 내가 "어떤 사람인지"는 Event에서 역프로파일링된 inferredTraits로 표출.
  */
 export function SelfForm({ initial }: { initial: Actor }) {
   const [name, setName] = useState(initial.displayName)
-  const [mbti, setMbti] = useState(initial.mbti ?? '')
   const [age, setAge] = useState(initial.age?.toString() ?? '')
   const [gender, setGender] = useState(initial.gender ?? '')
   const [occupation, setOccupation] = useState(initial.occupation ?? '')
 
-  // 기존 분리 필드들을 하나의 summary로 합쳐 보여줌
+  // 구 버전 분리 필드를 rawNotes로 합쳐서 1개 박스로 편집.
   const initialSummary = [
     initial.personalityNotes,
     initial.valuesNotes,
@@ -60,11 +51,8 @@ export function SelfForm({ initial }: { initial: Actor }) {
     setMsg(null)
     start(async () => {
       try {
-        // summary 박스는 rawNotes에만 저장. 세분 필드는 설문에서만 쓰도록 비우지 않고 유지.
-        // 단 유저가 summary 박스를 직접 수정한 경우 rawNotes 가 최신 버전.
         await updateSelf({
           displayName: name.trim() || undefined,
-          mbti: mbti || null,
           age: age ? parseInt(age, 10) : null,
           gender: gender || null,
           occupation: occupation.trim() || null,
@@ -79,6 +67,8 @@ export function SelfForm({ initial }: { initial: Actor }) {
     })
   }
 
+  const traits: InferredTrait[] = initial.inferredTraits ?? []
+
   return (
     <form
       onSubmit={(e) => {
@@ -87,22 +77,6 @@ export function SelfForm({ initial }: { initial: Actor }) {
       }}
       className="flex flex-col gap-4"
     >
-      {/* 설문 CTA */}
-      <Link href="/me/quiz">
-        <Card className="border-accent/40 bg-gradient-to-br from-accent/10 via-transparent to-accent-2/10 hover:border-accent/60 transition-colors">
-          <div className="flex items-center gap-3">
-            <Sparkles size={18} className="text-accent" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">나 잘 모르겠으면 설문</div>
-              <div className="text-[11px] text-muted mt-0.5">
-                6문항 답하면 AI가 성격·이상형·가치관 narrative 자동 채움 → 아래 요약 박스에 반영.
-              </div>
-            </div>
-            <span className="text-accent text-sm">→</span>
-          </div>
-        </Card>
-      </Link>
-
       {/* 기본 fact */}
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-3">기본</div>
@@ -142,86 +116,21 @@ export function SelfForm({ initial }: { initial: Actor }) {
               placeholder="회사원"
             />
           </div>
-
-          {/* MBTI 4축 */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-muted">MBTI (알면)</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-mono text-accent">
-                  {mbti || '? ? ? ?'}
-                </span>
-                {mbti && (
-                  <button
-                    type="button"
-                    onClick={() => setMbti('')}
-                    className="text-[11px] text-muted hover:text-accent"
-                  >
-                    지우기
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {MBTI_AXES.map((ax) => {
-                const curChar = mbti[ax.axis] ?? ''
-                const setAxis = (ch: string) => {
-                  const chars = mbti.padEnd(4, ' ').split('')
-                  chars[ax.axis] = ch === chars[ax.axis] ? ' ' : ch
-                  setMbti(chars.join('').trim() === '' ? '' : chars.join(''))
-                }
-                return (
-                  <div key={ax.axis} className="flex gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setAxis(ax.left)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-medium border ${
-                        curChar === ax.left
-                          ? 'bg-accent/15 border-accent text-accent'
-                          : 'bg-surface-2 border-border text-muted'
-                      }`}
-                    >
-                      {ax.leftLabel}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAxis(ax.right)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-medium border ${
-                        curChar === ax.right
-                          ? 'bg-accent/15 border-accent text-accent'
-                          : 'bg-surface-2 border-border text-muted'
-                      }`}
-                    >
-                      {ax.rightLabel}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
         </div>
       </Card>
 
-      {/* 요약 서술 — 메인 */}
+      {/* 요약 서술 — 자유 서술 (자가진단 대체) */}
       <Card>
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs text-muted uppercase tracking-wider">
-            내 요약
-          </div>
-          <Link href="/me/quiz" className="text-[11px] text-accent">
-            ✨ 설문으로 채우기 →
-          </Link>
-        </div>
+        <div className="text-xs text-muted uppercase tracking-wider mb-2">내 요약</div>
         <div className="text-[11px] text-muted mb-2 leading-relaxed">
-          성격·가치관·이상형·강점·약점 전부 한 박스. 자유 서술.
-          <br />
-          <span className="text-accent">설문 돌리면 여기에 AI가 narrative 써 넣어 저장.</span>
+          성격·가치관·이상형·강점·약점을 <strong>사실(Fact)</strong> 위주로 자유롭게.
+          MBTI·퀴즈는 쓰지 않아. 실제 행동 특성은 아래 &ldquo;관찰 누적&rdquo;에서 Event로부터 자동 추출돼.
         </div>
         <TextArea
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          rows={14}
-          placeholder={`예시:\n\n내향적, 친해지면 장난 많음. 깊은 대화 선호.\n커리어 > 결혼. 정직함 최우선.\n이상형: 자기 일 열심히 하고 가족 소중히 여기는 사람.\n강점: 약속 잘 지킴, 기억력 좋음.\n약점: 답장 너무 빠름, 확정 단계 주저함.\n딜브레이커는 아래 따로.`}
+          rows={12}
+          placeholder={`예시:\n\n내향적, 친해지면 장난 많음. 깊은 대화 선호.\n커리어 > 결혼. 정직함 최우선.\n이상형: 자기 일 열심히 하고 가족 소중히 여기는 사람.`}
         />
       </Card>
 
@@ -235,6 +144,27 @@ export function SelfForm({ initial }: { initial: Actor }) {
           onChange={setDealBreakers}
           placeholder="거짓말, 가족 험담, …"
         />
+      </Card>
+
+      {/* 역프로파일링 결과 — Event 기반 자동 추출 (읽기 전용) */}
+      <Card>
+        <div className="text-xs text-muted uppercase tracking-wider mb-2">
+          관찰 누적 · 내 행동에서 추출
+        </div>
+        {traits.length === 0 ? (
+          <div className="text-[11px] text-muted leading-relaxed">
+            아직 충분한 Event가 없음. 대화·사건을 기록하면 여기에 자동으로 &ldquo;이기적/관대함/진보/보수&rdquo; 같은 행동 축이 누적돼.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {traits.map((t, i) => (
+              <li key={i} className="text-xs leading-relaxed">
+                • {t.observation}
+                <span className="text-muted ml-1">({t.confidenceNarrative})</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
 
       {msg && <div className="text-xs text-muted text-center">{msg}</div>}

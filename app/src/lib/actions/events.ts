@@ -67,17 +67,19 @@ export async function listEvents(
     .limit(limit)
 }
 
-/** Event 수정 — 날짜·타입·내용 변경 가능. */
+/** Event 수정 — 날짜·타입·내용·selfNote(Why) 변경 가능. */
 export async function updateEvent(input: {
   id: string
   type?: EventType
   content?: string
+  selfNote?: string | null
   timestamp?: number
 }): Promise<void> {
   await ensureSchema()
   const updates: Record<string, unknown> = {}
   if (input.type !== undefined) updates.type = input.type
   if (input.content !== undefined) updates.content = input.content
+  if (input.selfNote !== undefined) updates.selfNote = input.selfNote
   if (input.timestamp !== undefined) updates.timestamp = new Date(input.timestamp)
 
   const [row] = await db.select().from(events).where(eq(events.id, input.id)).limit(1)

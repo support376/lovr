@@ -19,6 +19,12 @@
   "communicationPattern": "자연어 1문장 or 빈 문자열",
   "investmentAsymmetry": "자연어 1문장 or 빈 문자열",
   "escalationSpeed": "자연어 1문장 or 빈 문자열",
+  "selfTraits": [
+    {"observation": "예) 관대함 경향 — 갈등 시 먼저 사과", "confidence": "낮음|중간|높음"}
+  ],
+  "partnerTraits": [
+    {"observation": "예) 보수적 가치관 — 결혼·가족 화제 자주 꺼냄", "confidence": "낮음|중간|높음"}
+  ],
   "rationale": "주요 판단 근거 2~4줄. 어느 Event를 보고 어떻게 판단했는지."
 }
 ```
@@ -41,6 +47,10 @@
 - **communicationPattern**: "평균 응답 30분, 저녁 집중" 같은 패턴.
 - **investmentAsymmetry**: 시간·감정·돈 비대칭.
 - **escalationSpeed**: 친밀·스킨십 심화 속도.
+- **selfTraits / partnerTraits**: Event에서 **역프로파일링**된 행동 특성. MBTI/자가진단이 아니라 실제 행동·대사·선택에서 추출.
+  - 권장 축 예시(고정 아님): 이기적↔관대함 · 진보↔보수 · 안정↔모험 · 주도↔수동 · 감정↔논리 · 단기↔장기 · 일관↔변덕.
+  - 각 항목은 1문장. 근거가 약하면 빼라. 과거 관찰과 일치하면 확신 상향, 상충하면 빼거나 새 관찰로 대체.
+  - 많아야 최대 5개씩.
 
 ## 입력 구조
 

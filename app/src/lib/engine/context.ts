@@ -163,9 +163,11 @@ function renderMarkdown(c: {
     for (const e of c.events) {
       const ts = e.timestamp instanceof Date ? e.timestamp : new Date(Number(e.timestamp))
       lines.push(`### [${e.type}] ${ts.toISOString()}`)
+      lines.push('**Fact (유저가 입력한 사실):**')
       lines.push(e.content)
       if (e.selfNote) {
-        lines.push(`> self_note: ${e.selfNote}`)
+        lines.push('**Why (유저의 해석·맥락):**')
+        lines.push(e.selfNote)
       }
       if ((e.contextTags ?? []).length > 0) {
         lines.push(`tags: ${e.contextTags!.join(', ')}`)

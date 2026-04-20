@@ -166,6 +166,23 @@ export async function ensureSchema() {
   await db.run(
     sql`CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)`
   )
+
+  // users — Auth.js 연동 대기용. 아직 기존 경로는 사용하지 않음.
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      email TEXT NOT NULL UNIQUE,
+      provider TEXT NOT NULL,
+      provider_account_id TEXT NOT NULL,
+      display_name TEXT,
+      image_url TEXT,
+      self_actor_id TEXT,
+      turso_db_url TEXT,
+      turso_auth_token TEXT
+    )
+  `)
+  await db.run(sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`)
 }
 
 async function tryAdd(table: string, column: string, type: string) {

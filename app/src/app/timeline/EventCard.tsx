@@ -49,6 +49,7 @@ export function EventCard({ e }: { e: Event }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(e.content)
+  const [why, setWhy] = useState(e.selfNote ?? '')
   const [type, setType] = useState<EventType>(e.type as EventType)
   const [date, setDate] = useState(
     toInputDate(e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp))
@@ -71,7 +72,13 @@ export function EventCard({ e }: { e: Event }) {
     const newTs = new Date(date + 'T12:00').getTime()
     start(async () => {
       try {
-        await updateEvent({ id: e.id, content: content.trim(), type, timestamp: newTs })
+        await updateEvent({
+          id: e.id,
+          content: content.trim(),
+          selfNote: why.trim() ? why.trim() : null,
+          type,
+          timestamp: newTs,
+        })
         setEditing(false)
         router.refresh()
       } catch (err) {
@@ -117,10 +124,19 @@ export function EventCard({ e }: { e: Event }) {
           onChange={(ev) => setDate(ev.target.value)}
           className="w-full rounded-lg bg-surface-2 border border-border px-3 py-1.5 text-xs outline-none focus:border-accent mb-2"
         />
+        <div className="text-[11px] text-muted px-0.5 mb-1">사실</div>
         <textarea
           value={content}
           onChange={(ev) => setContent(ev.target.value)}
           rows={6}
+          className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y"
+        />
+        <div className="text-[11px] text-muted px-0.5 mt-2 mb-1">왜 (선택)</div>
+        <textarea
+          value={why}
+          onChange={(ev) => setWhy(ev.target.value)}
+          rows={2}
+          placeholder="너의 해석·맥락"
           className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y"
         />
         {err && (
@@ -134,6 +150,7 @@ export function EventCard({ e }: { e: Event }) {
             onClick={() => {
               setEditing(false)
               setContent(e.content)
+              setWhy(e.selfNote ?? '')
               setType(e.type as EventType)
               setDate(toInputDate(ts))
             }}
@@ -167,9 +184,18 @@ export function EventCard({ e }: { e: Event }) {
       {expanded && (
         <div className="mt-2.5 pt-2.5 border-t border-border">
           <div className="text-[11px] text-muted mb-2">{fmtDateFull(ts)}</div>
+          <div className="text-[11px] text-muted mb-1">사실</div>
           <div className="text-sm whitespace-pre-wrap leading-relaxed mb-3">
             {e.content}
           </div>
+          {e.selfNote && (
+            <>
+              <div className="text-[11px] text-muted mb-1">왜</div>
+              <div className="text-sm whitespace-pre-wrap leading-relaxed mb-3 text-muted italic">
+                {e.selfNote}
+              </div>
+            </>
+          )}
           <div className="flex gap-2">
             <Button
               variant="secondary"

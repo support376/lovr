@@ -1,11 +1,13 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
-import { relationships } from '../db/schema'
+import { actors, relationships, type InferredTrait } from '../db/schema'
 import { ensureSchema } from '../db/init'
 import { anthropic, MID_MODEL } from '../ai/client'
 import { buildContext } from './context'
 import { stateInferencePrompt } from '../prompts/loader'
+
+type RawTrait = { observation?: string; confidence?: string }
 
 export type DerivedState = {
   progress: string
@@ -15,6 +17,8 @@ export type DerivedState = {
   communicationPattern: string
   investmentAsymmetry: string
   escalationSpeed: string
+  selfTraits: RawTrait[]
+  partnerTraits: RawTrait[]
   rationale: string
 }
 
@@ -56,6 +60,8 @@ export async function deriveRelationshipState(relationshipId: string): Promise<{
         communicationPattern: ctx.relationship.communicationPattern ?? '',
         investmentAsymmetry: ctx.relationship.investmentAsymmetry ?? '',
         escalationSpeed: ctx.relationship.escalationSpeed ?? '',
+        selfTraits: [],
+        partnerTraits: [],
         rationale: '이벤트 없음 — 추론 스킵.',
       },
       updatedFields: [],
@@ -124,6 +130,8 @@ ${current}`,
     communicationPattern: (parsed.communicationPattern ?? '').trim(),
     investmentAsymmetry: (parsed.investmentAsymmetry ?? '').trim(),
     escalationSpeed: (parsed.escalationSpeed ?? '').trim(),
+    selfTraits: Array.isArray(parsed.selfTraits) ? parsed.selfTraits : [],
+    partnerTraits: Array.isArray(parsed.partnerTraits) ? parsed.partnerTraits : [],
     rationale: (parsed.rationale ?? '').trim(),
   }
 
@@ -155,7 +163,45 @@ ${current}`,
     })
     .where(eq(relationships.id, relationshipId))
 
+  // 역프로파일링 trait를 self/partner actor에 저장 (덮어쓰기: 이 추론이 최신 관찰)
+  const eventIds = ctx.events.map((e) => e.id)
+  const now = Date.now()
+  if (ctx.self) {
+    const traits = toInferredTraits(derived.selfTraits, eventIds, now)
+    if (traits.length > 0) {
+      await db
+        .update(actors)
+        .set({ inferredTraits: traits })
+        .where(eq(actors.id, ctx.self.id))
+    }
+  }
+  if (ctx.partner) {
+    const traits = toInferredTraits(derived.partnerTraits, eventIds, now)
+    if (traits.length > 0) {
+      await db
+        .update(actors)
+        .set({ inferredTraits: traits })
+        .where(eq(actors.id, ctx.partner.id))
+    }
+  }
+
   return { derived, updatedFields }
+}
+
+function toInferredTraits(
+  raw: RawTrait[],
+  evidenceIds: string[],
+  at: number
+): InferredTrait[] {
+  return raw
+    .filter((t) => t && typeof t.observation === 'string' && t.observation.trim())
+    .map((t) => ({
+      observation: t.observation!.trim(),
+      evidenceEventIds: evidenceIds,
+      confidenceNarrative: (t.confidence ?? '중간').trim() || '중간',
+      firstObserved: at,
+      lastUpdated: at,
+    }))
 }
 
 function extractJson(s: string): string {

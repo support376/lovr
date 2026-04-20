@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/daily-propose",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 21 * * 0"
     }
   ]
 }
