@@ -1,22 +1,16 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Lock } from 'lucide-react'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
 import { actions as actionsTbl, goals, outcomes } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
-import { Card } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
 import { STAGES, GOALS } from '@/lib/ontology'
-import {
-  canAccessMultiTargetReport,
-  getCurrentTier,
-} from '@/lib/billing/tier'
 
 export default async function RelationshipPage({
   params,
@@ -140,57 +134,7 @@ export default async function RelationshipPage({
             </>
           )}
         </section>
-
-        {/* 다면 관계 리포트 — Deep tier 전용. 잠금 배지로 포지션만 박아둠. */}
-        <MultiTargetReportCTA relationshipId={id} />
       </div>
     </>
-  )
-}
-
-function MultiTargetReportCTA({ relationshipId }: { relationshipId: string }) {
-  const tier = getCurrentTier()
-  const unlocked = canAccessMultiTargetReport(tier)
-
-  const body = (
-    <Card
-      className={
-        unlocked
-          ? 'border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors'
-          : 'border-border bg-surface-2/40'
-      }
-    >
-      <div className="flex items-center gap-2.5">
-        <Lock
-          size={14}
-          className={`${unlocked ? 'text-warn' : 'text-muted'} shrink-0`}
-        />
-        <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs font-semibold">다면 패턴 리포트</span>
-          {!unlocked && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-semibold">
-              Deep
-            </span>
-          )}
-        </div>
-        <span
-          className={`text-[11px] shrink-0 ${
-            unlocked ? 'text-warn' : 'text-muted'
-          }`}
-        >
-          {unlocked ? '→' : '잠김'}
-        </span>
-      </div>
-    </Card>
-  )
-
-  return (
-    <section>
-      {unlocked ? (
-        <Link href={`/r/${relationshipId}/report`}>{body}</Link>
-      ) : (
-        body
-      )}
-    </section>
   )
 }
