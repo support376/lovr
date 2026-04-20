@@ -39,7 +39,7 @@ function Hero() {
         <Zap size={11} /> Private beta · 2026
       </div>
       <h1 className="text-[2.6rem] leading-[1.05] font-bold tracking-tight">
-        연애는
+        사랑은
         <br />
         <span className="bg-gradient-to-br from-accent to-accent-2 bg-clip-text text-transparent">
           기억력 싸움
@@ -113,7 +113,7 @@ function HowSection() {
       title: '나를 알려줘',
       time: '2분',
       desc:
-        '강점·약점·MBTI·이상형. AI가 즉시 1차 프로파일링해서 너의 연애 운영 스타일을 파악함.',
+        '강점·약점·MBTI·이상형. AI가 즉시 1차 프로파일링해서 너의 사랑 운영 스타일을 파악함.',
     },
     {
       n: 2,
@@ -253,7 +253,7 @@ function FinalCTA() {
     <section className="px-6 py-12 flex flex-col items-center text-center">
       <ListTodo size={32} className="text-accent mb-3" />
       <h2 className="text-2xl font-bold tracking-tight leading-tight">
-        네 연애를 그만
+        네 사랑을 그만
         <br />
         기억력으로 운영하지 마.
       </h2>

@@ -6,7 +6,7 @@ import { getSelf } from '@/lib/actions/self'
 
 export const metadata: Metadata = {
   title: 'LuvOS',
-  description: '너의 연애를 운영하는 법',
+  description: '너의 사랑을 운영하는 법',
   applicationName: 'LuvOS',
   manifest: '/manifest.json',
 }
@@ -46,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               LuvOS
             </div>
             <div className="mt-4 text-lg text-muted leading-relaxed">
-              너의 연애를 <br />
+              너의 사랑을 <br />
               운영하는 법.
             </div>
             <div className="mt-6 text-xs text-muted/70 leading-relaxed">
