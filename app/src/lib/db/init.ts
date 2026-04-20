@@ -1,6 +1,8 @@
 import 'server-only'
 import { db } from './client'
 import { sql } from 'drizzle-orm'
+import { LEGACY_STAGE_MAP } from '../ontology/stages'
+import { isValidGoalKey } from '../ontology/goals'
 
 let initialized = false
 
@@ -58,7 +60,7 @@ export async function ensureSchema() {
       partner_id TEXT NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
       description TEXT,
       style TEXT,
-      progress TEXT NOT NULL DEFAULT 'observing',
+      progress TEXT NOT NULL DEFAULT 'pre_match',
       exclusivity TEXT NOT NULL DEFAULT 'unknown',
       conflict_state TEXT NOT NULL DEFAULT 'healthy',
       power_balance TEXT,
@@ -166,6 +168,51 @@ export async function ensureSchema() {
   await db.run(
     sql`CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)`
   )
+
+  await migrateOntologyV2()
+}
+
+/**
+ * v2 온톨로지 마이그레이션 — 기존 DB 의 legacy stage/goal 값을 새 enum 으로 정규화.
+ *   - relationships.progress: legacy 7-stage + 8-state → 5-stage (StageKey)
+ *   - goals.category: legacy 10-goal → 구버전 카테고리는 모두 deprecated 처리
+ *
+ * idempotent. 이미 새 값으로 정규화된 row 는 건드리지 않는다.
+ */
+async function migrateOntologyV2() {
+  // relationships.progress 정규화
+  const rels = await db.all<{ id: string; progress: string }>(
+    sql`SELECT id, progress FROM relationships`
+  )
+  for (const r of rels as Array<{ id: string; progress: string }>) {
+    const current = r.progress
+    // 이미 새 StageKey 인지 확인
+    const isNewKey =
+      current === 'pre_match' ||
+      current === 'early_dating' ||
+      current === 'stable' ||
+      current === 'long_term' ||
+      current === 'post_breakup'
+    if (isNewKey) continue
+
+    const mapped = LEGACY_STAGE_MAP[current] ?? 'pre_match'
+    await db.run(
+      sql`UPDATE relationships SET progress = ${mapped} WHERE id = ${r.id}`
+    )
+  }
+
+  // goals.category — legacy 카테고리는 모두 deprecated 처리 (유저가 새로 설정하도록)
+  const goalsRows = await db.all<{ id: string; category: string; deprecated_at: number | null }>(
+    sql`SELECT id, category, deprecated_at FROM goals`
+  )
+  const nowMs = Date.now()
+  for (const g of goalsRows as Array<{ id: string; category: string; deprecated_at: number | null }>) {
+    if (g.deprecated_at) continue
+    if (isValidGoalKey(g.category)) continue
+    await db.run(
+      sql`UPDATE goals SET deprecated_at = ${nowMs} WHERE id = ${g.id}`
+    )
+  }
 }
 
 async function tryAdd(table: string, column: string, type: string) {

@@ -116,6 +116,7 @@ export default async function RelationshipPage({
             partnerId={rel.partner.id}
             primaryGoalId={primaryGoal?.id ?? null}
             hasAction={!!latestAction}
+            stage={rel.progress}
           />
 
           {latestAction && (

@@ -12,7 +12,7 @@
 
 ```
 {
-  "progress": "unknown|observing|approaching|exploring|exclusive|committed|decayed|ended",
+  "progress": "pre_match|early_dating|stable|long_term|post_breakup",
   "exclusivity": "unknown|open|exclusive|married",
   "conflictState": "healthy|tension|conflict|recovery",
   "powerBalance": "자연어 1문장 or 빈 문자열",
@@ -25,15 +25,13 @@
 
 ## 필드 정의
 
-- **progress**:
-  - `observing` — 아직 서로 제대로 모름, 첫 만남 전후
-  - `approaching` — 관심 있어 먼저 다가가는 중
-  - `exploring` — 양방향 호감 인식, 탐색·밀당
-  - `exclusive` — 독점적 관심 확인, 관계 확정 직전
-  - `committed` — 공식 연인
-  - `decayed` — 과거엔 활발했으나 모멘텀 소실
-  - `ended` — 종료됨
-  - `unknown` — 판단 불가
+- **progress** (관계 단계 — 5단계):
+  - `pre_match` — 탐색 중 / 미접촉. 아직 매칭 전이거나 본격 접촉 전.
+  - `early_dating` — 초기 데이팅. 썸 ~ 사귀는 초반. 판별·방향 결정 국면.
+  - `stable` — 안정 관계. 연인 확정, 루틴화. 갈등·심화·결혼 여부 판단.
+  - `long_term` — 장기 / 결혼. 권태·라이프플랜·이별 리스크 관리.
+  - `post_breakup` — 이별 후. 회복·패턴 복기 단계.
+  - 판단 불가하면 기존 저장값 유지 (입력의 "이전 추론" 값 그대로).
 
 - **exclusivity**: 독점 배타성. `married`는 유저 자신 기혼일 때.
 - **conflictState**: 현재 갈등 국면 위치.

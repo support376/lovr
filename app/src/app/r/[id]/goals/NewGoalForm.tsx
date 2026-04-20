@@ -1,27 +1,33 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, TextArea } from '@/components/ui'
 import { createGoalAction } from '@/lib/actions/coach'
 import type { Goal } from '@/lib/db/schema'
-import { GOALS, GOAL_ORDER, type GoalKey } from '@/lib/ontology'
-
-const CATEGORY_OPTIONS: Array<{ v: GoalKey; l: string; d: string }> =
-  GOAL_ORDER.map((k) => ({
-    v: k,
-    l: GOALS[k].ko,
-    d: GOALS[k].hint,
-  }))
+import {
+  GOALS,
+  ALLOWED_GOALS_BY_STAGE,
+  STAGES,
+  normalizeStage,
+  type GoalKey,
+} from '@/lib/ontology'
 
 export function NewGoalForm({
   relationshipId,
   partnerId,
+  stage,
 }: {
   relationshipId: string
   partnerId: string
+  stage: string
 }) {
-  const [category, setCategory] = useState<GoalKey>('build_interest')
+  const stageKey = useMemo(() => normalizeStage(stage), [stage])
+  const options = useMemo<GoalKey[]>(
+    () => ALLOWED_GOALS_BY_STAGE[stageKey],
+    [stageKey]
+  )
+  const [category, setCategory] = useState<GoalKey>(options[0])
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<'primary' | 'secondary'>('primary')
   const [pending, start] = useTransition()
@@ -62,24 +68,33 @@ export function NewGoalForm({
         }}
         className="flex flex-col gap-3"
       >
+        <div className="text-[11px] text-muted leading-relaxed">
+          현재 단계: <span className="text-accent font-medium">{STAGES[stageKey].ko}</span>
+          {' · '}이 단계에서 의미 있는 목표만 선택 가능.
+        </div>
+
         <div className="flex flex-col gap-2">
-          <span className="text-xs text-muted">카테고리</span>
+          <span className="text-xs text-muted">목표</span>
           <div className="flex flex-col gap-1.5">
-            {CATEGORY_OPTIONS.map((c) => (
-              <button
-                key={c.v}
-                type="button"
-                onClick={() => setCategory(c.v)}
-                className={`text-left rounded-xl border p-3 transition-colors ${
-                  category === c.v
-                    ? 'bg-accent/10 border-accent/40'
-                    : 'bg-surface-2 border-border'
-                }`}
-              >
-                <div className="text-sm font-semibold">{c.l}</div>
-                <div className="text-[11px] text-muted mt-0.5">{c.d}</div>
-              </button>
-            ))}
+            {options.map((k) => {
+              const g = GOALS[k]
+              const active = category === k
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setCategory(k)}
+                  className={`text-left rounded-xl border p-3 transition-colors ${
+                    active
+                      ? 'bg-accent/10 border-accent/40'
+                      : 'bg-surface-2 border-border'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{g.ko}</div>
+                  <div className="text-[11px] text-muted mt-0.5">{g.hint}</div>
+                </button>
+              )
+            })}
           </div>
         </div>
 

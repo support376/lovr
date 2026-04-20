@@ -1,20 +1,33 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card } from '@/components/ui'
 import { createGoalAction } from '@/lib/actions/coach'
-import { GOALS, GOAL_ORDER, type GoalKey } from '@/lib/ontology'
+import {
+  GOALS,
+  ALLOWED_GOALS_BY_STAGE,
+  STAGES,
+  normalizeStage,
+  type GoalKey,
+} from '@/lib/ontology'
 import type { Goal } from '@/lib/db/schema'
 
 export function InlineGoalForm({
   relationshipId,
   partnerId,
+  stage,
 }: {
   relationshipId: string
   partnerId: string
+  stage: string
 }) {
-  const [category, setCategory] = useState<GoalKey>('build_interest')
+  const stageKey = useMemo(() => normalizeStage(stage), [stage])
+  const options = useMemo<GoalKey[]>(
+    () => ALLOWED_GOALS_BY_STAGE[stageKey],
+    [stageKey]
+  )
+  const [category, setCategory] = useState<GoalKey>(options[0])
   const [desc, setDesc] = useState('')
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
@@ -45,12 +58,15 @@ export function InlineGoalForm({
   return (
     <Card className="border-accent/30">
       <div className="flex flex-col gap-2">
+        <div className="text-[11px] text-muted">
+          단계: <span className="text-accent font-medium">{STAGES[stageKey].ko}</span>
+        </div>
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value as GoalKey)}
           className="rounded-lg bg-surface-2 border border-border px-3 py-2.5 text-sm outline-none focus:border-accent"
         >
-          {GOAL_ORDER.map((k) => (
+          {options.map((k) => (
             <option key={k} value={k}>
               {GOALS[k].ko} — {GOALS[k].hint}
             </option>

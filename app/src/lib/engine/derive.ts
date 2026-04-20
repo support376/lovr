@@ -20,12 +20,10 @@ export type DerivedState = {
 
 const VALID_PROGRESS = new Set([
   'pre_match',
-  'first_contact',
-  'sseom',
-  'dating_early',
-  'dating_stable',
-  'conflict',
-  'reconnection',
+  'early_dating',
+  'stable',
+  'long_term',
+  'post_breakup',
 ])
 const VALID_EXCLUSIVITY = new Set(['unknown', 'open', 'exclusive', 'married'])
 const VALID_CONFLICT = new Set(['healthy', 'tension', 'conflict', 'recovery'])

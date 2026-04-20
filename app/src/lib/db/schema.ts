@@ -88,9 +88,9 @@ export const relationships = sqliteTable('relationships', {
     .notNull()
     .references(() => actors.id, { onDelete: 'cascade' }),
 
-  /** 다축 stage — 단일 스칼라 아님. */
-  progress: text('progress').notNull().default('observing'),
-  // 'unknown'|'observing'|'approaching'|'exploring'|'exclusive'|'committed'|'decayed'|'ended'
+  /** StageKey — ontology/stages.ts 참고. 5단계. */
+  progress: text('progress').notNull().default('pre_match'),
+  // 'pre_match'|'early_dating'|'stable'|'long_term'|'post_breakup'
   exclusivity: text('exclusivity').notNull().default('unknown'),
   // 'unknown'|'open'|'exclusive'|'married'
   conflictState: text('conflict_state').notNull().default('healthy'),

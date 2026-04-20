@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { createGoalAction, proposeStrategyAction } from '@/lib/actions/coach'
-import { GOALS, GOAL_ORDER, type GoalKey } from '@/lib/ontology'
+import {
+  GOALS,
+  ALLOWED_GOALS_BY_STAGE,
+  normalizeStage,
+  type GoalKey,
+} from '@/lib/ontology'
 import type { Goal } from '@/lib/db/schema'
 
 type Props = {
@@ -12,11 +17,12 @@ type Props = {
   partnerId: string
   primaryGoalId: string | null
   hasAction: boolean
+  stage: string
 }
 
 /**
  * 관계 화면 최상단 — 한 탭으로 "지금 행동 받기".
- * - 목표 없으면 카테고리 1개 고르면서 저장+제안 원클릭
+ * - 목표 없으면 현재 stage 에 허용된 goal 중 하나 고르면서 저장+제안 원클릭
  * - 목표 있으면 바로 제안/업데이트
  */
 export function QuickActionCTA({
@@ -24,8 +30,13 @@ export function QuickActionCTA({
   partnerId,
   primaryGoalId,
   hasAction,
+  stage,
 }: Props) {
-  const [category, setCategory] = useState<GoalKey>('build_interest')
+  const options = useMemo<GoalKey[]>(
+    () => ALLOWED_GOALS_BY_STAGE[normalizeStage(stage)],
+    [stage]
+  )
+  const [category, setCategory] = useState<GoalKey>(options[0])
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
@@ -73,7 +84,7 @@ export function QuickActionCTA({
         <>
           <div className="text-xs text-muted">어떤 목적?</div>
           <div className="flex flex-wrap gap-1.5">
-            {GOAL_ORDER.map((k) => (
+            {options.map((k) => (
               <button
                 key={k}
                 type="button"

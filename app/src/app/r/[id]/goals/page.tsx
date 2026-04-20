@@ -45,7 +45,11 @@ export default async function GoalsPage({
       <div className="px-5 pb-10 flex-1 flex flex-col gap-5">
         <section>
           <div className="text-xs text-muted uppercase tracking-wider mb-2">새 목표</div>
-          <NewGoalForm relationshipId={id} partnerId={rel.partner.id} />
+          <NewGoalForm
+            relationshipId={id}
+            partnerId={rel.partner.id}
+            stage={rel.progress}
+          />
         </section>
 
         <section>
