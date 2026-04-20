@@ -13,8 +13,10 @@ const PUBLIC_PATHS = new Set(['/login'])
 const PUBLIC_PREFIXES = ['/auth/', '/_next/']
 
 function hasSupabaseAuthCookie(req: NextRequest): boolean {
+  // Supabase SSR은 큰 토큰을 `sb-<ref>-auth-token.0`, `.1` 처럼 chunked 저장.
+  // `endsWith('-auth-token')` 만 보면 chunked 버전을 놓침 → includes() 로.
   return req.cookies.getAll().some(
-    (c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
+    (c) => c.name.startsWith('sb-') && c.name.includes('auth-token')
   )
 }
 
