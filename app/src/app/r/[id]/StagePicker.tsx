@@ -62,13 +62,13 @@ export function StagePicker({
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={pending}
-        className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-border bg-surface-2 hover:border-accent/40 disabled:opacity-60"
+        className="inline-flex items-center gap-2 text-sm px-3.5 py-2 rounded-xl border border-accent/40 bg-accent/10 hover:bg-accent/15 disabled:opacity-60"
       >
-        <span className="text-muted">단계</span>
-        <span className="text-accent font-medium">
+        <span className="text-[10px] text-muted uppercase tracking-wider">단계</span>
+        <span className="text-accent font-bold">
           {STAGES[currentKey].ko}
         </span>
-        <span className="text-muted">▾</span>
+        <span className="text-muted text-xs">▾</span>
       </button>
 
       {open && (

@@ -87,23 +87,31 @@ export default async function RelationshipPage({
         <DetailsToggle open={editOpen} relationshipId={id} />
       </header>
 
-      {/* 맥락 배지 — Stage (왼쪽) + Goal (오른쪽). 둘 다 즉시 변경. */}
-      <div className="px-5 pb-2 flex items-center gap-2 flex-wrap">
-        <StagePicker relationshipId={id} current={rel.progress} />
-        {daysSinceStage !== null && daysSinceStage > 0 && (
-          <span className="text-[10px] text-muted">
-            · {daysSinceStage}일째
-          </span>
-        )}
+      {/* 맥락 배지 — Stage (왼쪽) + Goal (오른쪽). 둘 다 큰 버튼. */}
+      <div className="px-5 pb-3 flex items-start gap-2">
+        <div className="flex flex-col gap-0.5">
+          <StagePicker relationshipId={id} current={rel.progress} />
+          {daysSinceStage !== null && daysSinceStage > 0 && (
+            <span className="text-[10px] text-muted pl-1">
+              · {daysSinceStage}일째
+            </span>
+          )}
+        </div>
         <Link
           href={`/r/${id}/goals`}
-          className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-border bg-surface-2 hover:border-accent/40"
+          className="ml-auto inline-flex items-center gap-2 text-sm px-3.5 py-2 rounded-xl border border-border bg-surface-2 hover:border-accent/40"
         >
-          <span className="text-muted">🎯</span>
-          <span className={goalLabel ? 'text-accent font-medium' : 'text-muted'}>
-            {goalLabel ?? '목표 미설정'}
+          <span className="text-[10px] text-muted uppercase tracking-wider">목표</span>
+          <span
+            className={
+              goalLabel
+                ? 'text-accent font-bold'
+                : 'text-muted font-medium'
+            }
+          >
+            {goalLabel ?? '미설정'}
           </span>
-          <span className="text-muted">▾</span>
+          <span className="text-muted text-xs">▾</span>
         </Link>
       </div>
 

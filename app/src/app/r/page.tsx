@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { listRelationships, getCurrentRelationship } from '@/lib/actions/relationships'
 import { Button, Card, Empty, PageHeader, Pill } from '@/components/ui'
+import { STAGES, normalizeStage } from '@/lib/ontology'
 
 export default async function RelationshipsIndex() {
   const self = await getSelf()
@@ -50,17 +51,20 @@ export default async function RelationshipsIndex() {
             <div className="text-xs text-muted uppercase tracking-wider">
               과거 관계 ({all.length})
             </div>
-            {all.map((r) => (
-              <Link key={r.id} href={`/r/${r.id}`}>
-                <Card className="hover:border-accent/60 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="font-semibold">{r.partner.displayName}</div>
-                    <Pill tone="neutral">{r.progress}</Pill>
-                    {r.status !== 'active' && <Pill tone="warn">{r.status}</Pill>}
-                  </div>
-                </Card>
-              </Link>
-            ))}
+            {all.map((r) => {
+              const stageKo = STAGES[normalizeStage(r.progress)].ko
+              return (
+                <Link key={r.id} href={`/r/${r.id}`}>
+                  <Card className="hover:border-accent/60 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold">{r.partner.displayName}</div>
+                      <Pill tone="accent">{stageKo}</Pill>
+                      {r.status !== 'active' && <Pill tone="warn">{r.status}</Pill>}
+                    </div>
+                  </Card>
+                </Link>
+              )
+            })}
           </>
         )}
       </div>
