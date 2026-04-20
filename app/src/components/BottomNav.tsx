@@ -1,15 +1,15 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Sparkles, Heart, Pencil, Settings } from 'lucide-react'
+import { Sparkles, Zap, Pencil, Settings } from 'lucide-react'
 import clsx from 'clsx'
 
 const items = [
   { href: '/', label: 'LuvAI', icon: Sparkles, match: (p: string) => p === '/' },
   {
     href: '/r',
-    label: '관계',
-    icon: Heart,
+    label: '전략',
+    icon: Zap,
     match: (p: string) => p === '/r' || p.startsWith('/r/'),
   },
   {

@@ -1,19 +1,17 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { Lock } from 'lucide-react'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { desc, eq, inArray, and } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
-import { actions as actionsTbl, goals, insights, outcomes } from '@/lib/db/schema'
+import { actions as actionsTbl, insights, outcomes } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
-import { Card, Pill } from '@/components/ui'
+import { Card } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
-import { StylePicker } from './StylePicker'
 import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
-import { STAGES, STYLES, GOALS } from '@/lib/ontology'
 
 export default async function RelationshipPage({
   params,
@@ -33,13 +31,6 @@ export default async function RelationshipPage({
   if (!rel) notFound()
 
   await ensureSchema()
-  const activeGoals = await db
-    .select()
-    .from(goals)
-    .where(and(eq(goals.relationshipId, id), isNull(goals.deprecatedAt)))
-    .orderBy(desc(goals.createdAt))
-  const primaryGoal =
-    activeGoals.find((g) => g.priority === 'primary') ?? activeGoals[0] ?? null
 
   const latestActions = await db
     .select()
@@ -70,18 +61,6 @@ export default async function RelationshipPage({
     (i) => !i.relationshipId || i.relationshipId === id
   )
 
-  const stageLabel =
-    rel.progress && STAGES[rel.progress as keyof typeof STAGES]
-      ? STAGES[rel.progress as keyof typeof STAGES].ko
-      : null
-  const styleLabel =
-    rel.style && STYLES[rel.style as keyof typeof STYLES]
-      ? STYLES[rel.style as keyof typeof STYLES].ko
-      : null
-  const goalLabel = primaryGoal
-    ? GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ?? primaryGoal.category
-    : null
-
   return (
     <>
       {/* 헤더 — 이름(나이) + 상세 토글 우측 */}
@@ -98,7 +77,6 @@ export default async function RelationshipPage({
             </h1>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-            {stageLabel && <Pill tone="accent">{stageLabel}</Pill>}
             {rel.partner.mbti && (
               <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted font-mono">
                 {rel.partner.mbti}
@@ -107,6 +85,11 @@ export default async function RelationshipPage({
             {rel.partner.occupation && (
               <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted">
                 {rel.partner.occupation}
+              </span>
+            )}
+            {rel.description && (
+              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted truncate max-w-[180px]">
+                {rel.description}
               </span>
             )}
           </div>
@@ -120,14 +103,9 @@ export default async function RelationshipPage({
           <PartnerInlineEditor rel={rel} showToggleButton={false} open={true} />
         )}
 
-        {/* 1. 행동 — 최상단 메인 */}
+        {/* 1. 전략 — 해야할 행동 */}
         <section className="flex flex-col gap-3">
-          <QuickActionCTA
-            relationshipId={id}
-            partnerId={rel.partner.id}
-            primaryGoalId={primaryGoal?.id ?? null}
-            hasAction={!!latestAction}
-          />
+          <QuickActionCTA relationshipId={id} hasAction={!!latestAction} />
 
           {latestAction && (
             <StrategyCards
@@ -138,68 +116,7 @@ export default async function RelationshipPage({
           )}
         </section>
 
-        {/* 2. 컨텍스트 요약 + 접힘 설정 */}
-        <details className="group rounded-2xl border border-border bg-surface/50 [&_summary::-webkit-details-marker]:hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 flex items-center gap-2 text-xs">
-            <span className="text-muted">맥락</span>
-            <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
-              {goalLabel ? (
-                <Pill tone="accent">{goalLabel}</Pill>
-              ) : (
-                <span className="text-muted">목표 미설정</span>
-              )}
-              {styleLabel ? (
-                <Pill tone="accent">{styleLabel}</Pill>
-              ) : (
-                <span className="text-muted">· 스타일 자동</span>
-              )}
-            </div>
-            <span className="text-[11px] text-muted group-open:rotate-180 transition-transform">
-              ▾
-            </span>
-          </summary>
-
-          <div className="px-4 pb-4 flex flex-col gap-3">
-            {rel.description && (
-              <div className="text-xs text-muted whitespace-pre-wrap leading-relaxed">
-                {rel.description}
-              </div>
-            )}
-
-            {/* 목표 미니 */}
-            <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2 px-3 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs text-muted shrink-0">🎯 목표</span>
-                {primaryGoal ? (
-                  <span className="text-sm truncate">
-                    {GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ??
-                      primaryGoal.category}
-                    {primaryGoal.description &&
-                    primaryGoal.description !==
-                      GOALS[primaryGoal.category as keyof typeof GOALS]?.ko
-                      ? ` · ${primaryGoal.description}`
-                      : ''}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted">
-                    아직 목표 설정 안 됨
-                  </span>
-                )}
-              </div>
-              <Link
-                href={`/r/${id}/goals`}
-                className="shrink-0 ml-2 text-[11px] text-accent"
-              >
-                변경
-              </Link>
-            </div>
-
-            {/* 스타일 */}
-            <StylePicker relationshipId={id} current={rel.style ?? null} />
-          </div>
-        </details>
-
-        {/* 3. 주간 Insight — 최근 active */}
+        {/* 2. 누적 Insight */}
         {relevantInsights.length > 0 && (
           <section>
             <div className="text-xs text-muted mb-1.5 flex items-center justify-between">
@@ -220,7 +137,7 @@ export default async function RelationshipPage({
           </section>
         )}
 
-        {/* 4. 다면 관계 리포트 */}
+        {/* 3. 다면 관계 리포트 */}
         <section>
           <Link href={`/r/${id}/report`}>
             <Card className="border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors">

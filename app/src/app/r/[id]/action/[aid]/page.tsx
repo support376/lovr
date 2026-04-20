@@ -5,7 +5,7 @@ import { desc, eq } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
-import { actions as actionsTbl, goals, outcomes } from '@/lib/db/schema'
+import { actions as actionsTbl, outcomes } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
 import { Card, PageHeader, Pill } from '@/components/ui'
 import { ActionControls } from './ActionControls'
@@ -25,7 +25,6 @@ export default async function ActionDetailPage({
   const [action] = await db.select().from(actionsTbl).where(eq(actionsTbl.id, aid)).limit(1)
   if (!action) notFound()
 
-  const [goal] = await db.select().from(goals).where(eq(goals.id, action.goalId)).limit(1)
   const out = await db
     .select()
     .from(outcomes)
@@ -50,7 +49,6 @@ export default async function ActionDetailPage({
             <Pill tone={action.status === 'executed' ? 'good' : 'neutral'}>
               {action.status}
             </Pill>
-            {goal && <Pill tone="accent">{goal.category}</Pill>}
           </div>
           <div className="mt-2 text-[11px] text-muted">
             제안: {new Date(action.proposedAt).toLocaleString('ko-KR')}

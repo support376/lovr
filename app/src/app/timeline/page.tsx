@@ -11,6 +11,25 @@ import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
+import { DeriveStateButton } from '../r/[id]/DeriveStateButton'
+
+const PROGRESS_KO: Record<string, string> = {
+  unknown: '판단 불가',
+  observing: '관찰 중',
+  approaching: '다가가는 중',
+  exploring: '서로 탐색',
+  exclusive: '독점 직전',
+  committed: '공식 연인',
+  decayed: '식어감',
+  ended: '종료',
+  pre_match: '매칭 전',
+  first_contact: '첫 접촉',
+  sseom: '썸',
+  dating_early: '연애 초기',
+  dating_stable: '연애 안정',
+  conflict: '갈등',
+  reconnection: '재연결',
+}
 
 export default async function TimelinePage({
   searchParams,
@@ -30,10 +49,10 @@ export default async function TimelinePage({
   return (
     <>
       <PageHeader
-        title="기록"
+        title="기록 · 분석"
         subtitle={
           focused
-            ? `${focused.partner.displayName} · Event 추가하면 LuvAI가 다음에 맥락으로 씀`
+            ? `${focused.partner.displayName} · 대화·사건 넣으면 "지금 어떤 상태로 보인다"가 따라와`
             : '먼저 관계를 등록해야 Event를 쌓을 수 있어'
         }
         right={
@@ -77,6 +96,57 @@ export default async function TimelinePage({
                 ))}
               </div>
             )}
+
+            {/* 지금 상태 — Event 기반 derive 결과 요약 */}
+            <Card className="border-accent/30 bg-gradient-to-br from-accent/5 via-transparent to-accent-2/5">
+              <div className="flex items-start gap-2">
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-muted uppercase tracking-wider">
+                      지금 상태
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] bg-accent/20 text-accent font-medium">
+                      {PROGRESS_KO[focused.progress] ?? focused.progress}
+                    </span>
+                  </div>
+                  {(focused.powerBalance ||
+                    focused.communicationPattern ||
+                    focused.investmentAsymmetry ||
+                    focused.escalationSpeed) ? (
+                    <ul className="flex flex-col gap-0.5 text-[11px] leading-relaxed">
+                      {focused.powerBalance && (
+                        <li>
+                          <span className="text-muted">· 힘:</span> {focused.powerBalance}
+                        </li>
+                      )}
+                      {focused.communicationPattern && (
+                        <li>
+                          <span className="text-muted">· 연락:</span>{' '}
+                          {focused.communicationPattern}
+                        </li>
+                      )}
+                      {focused.investmentAsymmetry && (
+                        <li>
+                          <span className="text-muted">· 투자:</span>{' '}
+                          {focused.investmentAsymmetry}
+                        </li>
+                      )}
+                      {focused.escalationSpeed && (
+                        <li>
+                          <span className="text-muted">· 심화:</span>{' '}
+                          {focused.escalationSpeed}
+                        </li>
+                      )}
+                    </ul>
+                  ) : (
+                    <div className="text-[11px] text-muted leading-relaxed">
+                      아직 Event 기반 상태 추론 없음. 아래에 대화·사건 1~2개 기록하고 재분석 눌러.
+                    </div>
+                  )}
+                </div>
+                <DeriveStateButton relationshipId={focused.id} />
+              </div>
+            </Card>
 
             <AddEventForm relationshipId={focused.id} />
 

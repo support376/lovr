@@ -227,6 +227,7 @@ export const actions = sqliteTable('actions', {
     .notNull()
     .references(() => relationships.id, { onDelete: 'cascade' }),
 
+  /** Legacy FK — 온톨로지 정리 후 엔진이 관계별 "auto" goal을 조용히 생성해 재사용. UI에는 노출 안 됨. */
   goalId: text('goal_id')
     .notNull()
     .references(() => goals.id, { onDelete: 'cascade' }),

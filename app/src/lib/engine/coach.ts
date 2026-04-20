@@ -1,6 +1,6 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '../db/client'
 import {
   actions as actionsTbl,
@@ -18,78 +18,34 @@ import {
   weeklyReportPrompt,
 } from '../prompts/loader'
 import { buildContext } from './context'
-import { evaluateActionText, evaluateGoal } from '../rules/ethics'
-import { promptContextBlock, findPlays, playsPromptBlock } from '../ontology'
 
 /**
- * 전략 제안 생성 (ontology 3.2).
- * 윤리 룰 → LLM → Action 레코드 저장.
+ * 6노드 온톨로지 기반 전략 제안.
+ * 입력: User · Target · Events(Fact/Why) · Relationship State · 최근 Outcomes · active Insights.
+ * Goal·Style·Plays 카탈로그·윤리 엔진 모두 제거됨. 자연어 자유 추출.
+ *
+ * DB 레거시: actions.goalId NOT NULL 제약 때문에 관계당 1개 "auto" goal을 조용히 유지하고 FK 채움.
  */
 export async function proposeStrategy(params: {
   relationshipId: string
-  goalId: string
-  currentSituation: string // 유저가 이번 쿼리 때 쓰는 추가 맥락
-}): Promise<{ actionId: string; markdown: string; ethicsStatus: string }> {
+  currentSituation?: string
+}): Promise<{ actionId: string; markdown: string }> {
   await ensureSchema()
 
   const ctx = await buildContext(params.relationshipId, 30)
 
-  // 1. Goal + self/partner 기준 윤리 체크
-  const goal = ctx.goals.find((g) => g.id === params.goalId)
-  if (!goal) throw new Error('Goal not found')
-
-  if (ctx.self && ctx.partner) {
-    const goalEval = evaluateGoal({
-      self: ctx.self,
-      partner: ctx.partner,
-      goalCategory: goal.category as never,
-    })
-    if (goalEval.status === 'blocked') {
-      throw new Error(
-        `윤리 룰 차단: ${goalEval.results.map((r) => r.reason).join(' / ')}`
-      )
-    }
-  }
-
-  // 2. LLM — 전략 3안. stage·goal·style 온톨로지 블록 + Play 카탈로그 주입.
   const client = anthropic()
   const system = strategyProposalPrompt()
-  const ontologyBlock = promptContextBlock({
-    stage: ctx.relationship?.progress ?? null,
-    goal: goal.category,
-    style: ctx.relationship?.style ?? null,
-  })
-  const candidatePlays = findPlays({
-    stage: ctx.relationship?.progress ?? null,
-    goal: goal.category,
-    style: ctx.relationship?.style ?? null,
-  })
-  const plays =
-    candidatePlays.length > 0
-      ? candidatePlays
-      : findPlays({
-          stage: ctx.relationship?.progress ?? null,
-          goal: goal.category,
-        })
-  const playsBlock = playsPromptBlock(plays)
-
   const userMsg = `${ctx.markdown}
 
-${ontologyBlock}
-
-${playsBlock}
-
 ## [이번 쿼리 추가 맥락]
-${params.currentSituation}
+${params.currentSituation?.trim() || '(없음 · 최근 Event 기반으로만 제안)'}
 
-## [목표]
-${goal.category} — ${goal.description}
-
-전략 3안 출력. 반드시 [답변 스타일]의 톤·언어·실패 모드를 따를 것.`
+지금까지의 모든 맥락 + 관찰된 행동·파워 다이내믹·과거 시도 결과를 읽고, **지금 해야 할 행동 3개**를 제안하라. 명령조, 구체적으로.`
 
   const res = await client.messages.create({
     model: MODEL,
-    max_tokens: 3000,
+    max_tokens: 1500,
     system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userMsg }],
   })
@@ -100,39 +56,62 @@ ${goal.category} — ${goal.description}
     .join('\n')
     .trim()
 
-  // 3. Action 텍스트 레벨 윤리 재검증
-  const actionEval =
-    ctx.self && ctx.partner
-      ? evaluateActionText({
-          actionContent: markdown,
-          self: ctx.self,
-          partner: ctx.partner,
-        })
-      : { status: 'ok' as const, results: [], applicableLaws: [] }
+  const autoGoalId = await ensureAutoGoal(params.relationshipId)
 
   const id = `act-${randomUUID()}`
   await db.insert(actionsTbl).values({
     id,
     relationshipId: params.relationshipId,
-    goalId: goal.id,
+    goalId: autoGoalId,
     source: 'ai_proposed',
     content: markdown,
     status: 'proposed',
-    ethicsStatus: actionEval.status,
-    ethicsReasons: actionEval.results.map((r) => `[${r.ruleId}] ${r.reason}`),
+    ethicsStatus: 'ok',
+    ethicsReasons: [],
   })
 
-  return { actionId: id, markdown, ethicsStatus: actionEval.status }
+  return { actionId: id, markdown }
 }
 
 /**
- * 실행 후 결과 분석 (ontology 3.3).
- * action + action 이후 event들을 LLM에 던져 Outcome 초안 생성.
+ * 관계당 1개 유지되는 placeholder goal id. 레거시 FK 만족용, UI 노출 X.
  */
-export async function analyzeOutcome(actionId: string): Promise<{
-  outcomeId: string
-  markdown: string
-}> {
+async function ensureAutoGoal(relationshipId: string): Promise<string> {
+  const existing = await db
+    .select()
+    .from(goals)
+    .where(
+      and(
+        eq(goals.relationshipId, relationshipId),
+        eq(goals.category, 'auto'),
+        isNull(goals.deprecatedAt)
+      )
+    )
+    .limit(1)
+  if (existing[0]) return existing[0].id
+
+  const id = `goal-${randomUUID()}`
+  await db.insert(goals).values({
+    id,
+    relationshipId,
+    category: 'auto',
+    description: '(legacy placeholder — ontology 제거 후 자동 생성)',
+    priority: 'primary',
+    ethicsStatus: 'ok',
+    ethicsReasons: [],
+    applicableLaws: [],
+  })
+  return id
+}
+
+/**
+ * 실행 후 결과 분석. Outcome 기록.
+ * 유저가 직접 메모를 남긴 경우 userNote를 함께 주입.
+ */
+export async function analyzeOutcome(
+  actionId: string,
+  userNote?: string
+): Promise<{ outcomeId: string; markdown: string }> {
   await ensureSchema()
   const [action] = await db
     .select()
@@ -141,10 +120,8 @@ export async function analyzeOutcome(actionId: string): Promise<{
     .limit(1)
   if (!action) throw new Error('Action not found')
 
-  const [goal] = await db.select().from(goals).where(eq(goals.id, action.goalId)).limit(1)
   const ctx = await buildContext(action.relationshipId, 50)
 
-  // action.executedAt 이후 events만 필터
   const executedAt =
     action.executedAt instanceof Date
       ? action.executedAt.getTime()
@@ -173,11 +150,11 @@ export async function analyzeOutcome(actionId: string): Promise<{
   const userMsg = `## [action]
 ${action.content}
 
-## [goal]
-${goal?.category ?? '?'} / ${goal?.description ?? '?'}
-
 ## [executed_at]
 ${executedAt ? new Date(executedAt).toISOString() : '(미실행)'}
+
+## [유저가 남긴 결과 메모]
+${userNote?.trim() || '(없음)'}
 
 ## [events after executed_at]
 ${eventsBlock}
@@ -198,26 +175,26 @@ ${ctx.markdown}`
     .join('\n')
     .trim()
 
-  // Outcome 테이블 저장. markdown을 narrative에 통째로, 파싱은 나중에.
+  const combined = userNote?.trim()
+    ? `**유저 메모:**\n${userNote.trim()}\n\n---\n\n**분석:**\n${markdown}`
+    : markdown
+
   const id = `out-${randomUUID()}`
   await db.insert(outcomes).values({
     id,
     actionId,
     observedSignals: eventsBlock,
     relatedEventIds: afterEvents.map((e) => e.id),
-    goalProgress: 'unclear', // 파싱 정교화는 후순위
+    goalProgress: 'unclear',
     surpriseLevel: 'expected',
-    narrative: markdown,
+    narrative: combined,
     lessons: [],
     triggeredActionIds: [],
   })
 
-  return { outcomeId: id, markdown }
+  return { outcomeId: id, markdown: combined }
 }
 
-/**
- * Action을 실행 완료 상태로 전환.
- */
 export async function markActionExecuted(actionId: string): Promise<void> {
   await ensureSchema()
   await db
@@ -227,8 +204,7 @@ export async function markActionExecuted(actionId: string): Promise<void> {
 }
 
 /**
- * 주간 리포트 (ontology 3.5).
- * 지난 7일 event/action/outcome을 받아 Insight 초안 생성.
+ * 주간 리포트 — 지난 7일 Event/Action/Outcome을 받아 Insight 초안 생성.
  */
 export async function generateWeeklyReport(relationshipId: string): Promise<{
   markdown: string

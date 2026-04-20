@@ -7,7 +7,6 @@ import {
   updatePartner,
   updateRelationship,
 } from '@/lib/actions/relationships'
-import { STAGES, STAGE_ORDER } from '@/lib/ontology'
 import type { Actor, InferredTrait, Relationship } from '@/lib/db/schema'
 
 const GENDER_OPTIONS = [
@@ -18,8 +17,8 @@ const GENDER_OPTIONS = [
 ]
 
 /**
- * 관계 탭 헤더 옆 "상세" 버튼으로 열리는 인라인 편집.
- * 스타일은 여기 없음 (별도 StylePicker).
+ * 전략 탭 헤더 옆 "상세" 버튼으로 열리는 인라인 편집.
+ * 관계 단계(progress)는 유저 직접 선택 X — Event 기반 derive 엔진이 기록.
  */
 export function PartnerInlineEditor({
   rel,
@@ -49,7 +48,6 @@ export function PartnerInlineEditor({
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
 
   // Relationship fields
-  const [stage, setStage] = useState(rel.progress)
   const [description, setDescription] = useState(rel.description ?? '')
 
   const submit = () => {
@@ -58,7 +56,6 @@ export function PartnerInlineEditor({
       try {
         await updateRelationship(rel.id, {
           description: description.trim() || null,
-          progress: stage,
         } as never)
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
@@ -153,21 +150,6 @@ export function PartnerInlineEditor({
           placeholder="예) ENFP"
           className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm font-mono outline-none focus:border-accent"
         />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">관계 단계</span>
-        <select
-          value={stage}
-          onChange={(e) => setStage(e.target.value)}
-          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
-        >
-          {STAGE_ORDER.map((k) => (
-            <option key={k} value={k}>
-              {STAGES[k].ko} — {STAGES[k].hint}
-            </option>
-          ))}
-        </select>
       </label>
 
       <label className="flex flex-col gap-1">

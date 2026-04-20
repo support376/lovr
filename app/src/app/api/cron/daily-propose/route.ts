@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
-import { actions as actionsTbl, goals, events, relationships } from '@/lib/db/schema'
+import { actions as actionsTbl, events, relationships } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
 import { proposeStrategy } from '@/lib/engine/coach'
 
@@ -45,24 +45,6 @@ export async function GET(req: Request) {
 
   for (const rel of activeRels) {
     try {
-      // Primary goal
-      const primary = (
-        await db
-          .select()
-          .from(goals)
-          .where(and(eq(goals.relationshipId, rel.id), isNull(goals.deprecatedAt)))
-          .orderBy(desc(goals.createdAt))
-      ).find((g) => g.priority === 'primary')
-
-      if (!primary) {
-        results.push({ relationshipId: rel.id, status: 'skipped', reason: 'no_goal' })
-        continue
-      }
-      if (primary.ethicsStatus === 'blocked') {
-        results.push({ relationshipId: rel.id, status: 'skipped', reason: 'blocked' })
-        continue
-      }
-
       // Events 수
       const evRows = await db
         .select({ id: events.id })
@@ -97,10 +79,8 @@ export async function GET(req: Request) {
         }
       }
 
-      // 실행
       const r = await proposeStrategy({
         relationshipId: rel.id,
-        goalId: primary.id,
         currentSituation: '(매일 자동 업데이트 · 최근 Event 기반)',
       })
       results.push({ relationshipId: rel.id, status: 'proposed', actionId: r.actionId })
@@ -112,9 +92,6 @@ export async function GET(req: Request) {
       })
     }
   }
-
-  // inArray 사용 없어도 되지만 import 안 지우려고 noop
-  void inArray
 
   return NextResponse.json({
     ran: new Date().toISOString(),

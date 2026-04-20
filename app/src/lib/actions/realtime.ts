@@ -10,27 +10,6 @@ import {
 } from '../prompts/loader'
 import { addEvent } from './events'
 import { getCurrentRelationship } from './relationships'
-import { promptContextBlock } from '../ontology'
-import { db } from '../db/client'
-import { goals as goalsTbl } from '../db/schema'
-import { and, desc, eq, isNull } from 'drizzle-orm'
-
-async function loadOntologyBlockForCurrent(): Promise<string> {
-  const cur = await getCurrentRelationship()
-  if (!cur) return ''
-  const primary = (
-    await db
-      .select()
-      .from(goalsTbl)
-      .where(and(eq(goalsTbl.relationshipId, cur.id), isNull(goalsTbl.deprecatedAt)))
-      .orderBy(desc(goalsTbl.createdAt))
-  ).find((g) => g.priority === 'primary')
-  return promptContextBlock({
-    stage: cur.progress,
-    goal: primary?.category ?? null,
-    style: cur.style,
-  })
-}
 
 export async function askFast(input: {
   chunk: string
@@ -38,7 +17,6 @@ export async function askFast(input: {
 }): Promise<{ tag: string }> {
   const client = anthropic()
   const sys = realtimeFastPrompt()
-  const ontologyBlock = await loadOntologyBlockForCurrent()
   const res = await client.messages.create({
     model: FAST_MODEL,
     max_tokens: 30,
@@ -46,7 +24,7 @@ export async function askFast(input: {
     messages: [
       {
         role: 'user',
-        content: `## [최근 transcript 청크]\n${input.chunk}\n\n${ontologyBlock}`,
+        content: `## [최근 transcript 청크]\n${input.chunk}`,
       },
     ],
   })
@@ -67,7 +45,6 @@ export async function askMid(input: {
     const ctx = await buildContext(input.relationshipId, 8)
     ctxMd = ctx.markdown
   }
-  const ontologyBlock = await loadOntologyBlockForCurrent()
   const client = anthropic()
   const res = await client.messages.create({
     model: MID_MODEL,
@@ -78,7 +55,7 @@ export async function askMid(input: {
     messages: [
       {
         role: 'user',
-        content: `## [누적 transcript]\n${input.transcript}\n\n## [맥락]\n${ctxMd}\n\n${ontologyBlock}`,
+        content: `## [누적 transcript]\n${input.transcript}\n\n## [맥락]\n${ctxMd}`,
       },
     ],
   })
@@ -122,15 +99,11 @@ export async function askTenMinReport(input: {
     .map((t) => `- ${t.text}`)
     .join('\n')
 
-  const ontologyBlock = await loadOntologyBlockForCurrent()
-
   const userMsg = `## [대화 경과]
 ${input.elapsedMin}분
 
 ## [맥락]
 ${ctxMd}
-
-${ontologyBlock}
 
 ## [내 발언]
 ${mine || '(없음)'}
