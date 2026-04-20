@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, X } from 'lucide-react'
+import { Check, X, Copy, CheckCheck } from 'lucide-react'
 import {
   markActionCancelledAction,
-  markActionExecutedAction,
   recordManualOutcomeAction,
 } from '@/lib/actions/coach'
 
@@ -19,22 +18,21 @@ const PROGRESS_OPTIONS: Array<{ v: Progress; l: string }> = [
 ]
 
 /**
- * Action closed-loop.
- *
- * 플로우 단순화:
- *   1) 미정 → [ 했음 ] [ 안 했음 ] 2버튼
- *   2) '했음' 클릭 → 결과 입력 폼 (진행도 + narrative). '나중에' 로 스킵 가능.
- *   3) '안 했음' → 즉시 cancelled.
- *   4) settled 상태는 요약 한 줄 + 결과 기록 추가 링크.
+ * Primary Action closed-loop 버튼 행.
+ *   - 복사: messageDraft clipboard
+ *   - 보냄: 결과 입력 폼 노출 (executed + outcome)
+ *   - 패스: cancelled
  */
 export function ActionFeedback({
   actionId,
   status,
   hasOutcome,
+  messageDraft,
 }: {
   actionId: string
   status: string
   hasOutcome: boolean
+  messageDraft?: string
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -42,6 +40,7 @@ export function ActionFeedback({
   const [mode, setMode] = useState<'idle' | 'outcome'>('idle')
   const [progress, setProgress] = useState<Progress>('advanced')
   const [narrative, setNarrative] = useState('')
+  const [copied, setCopied] = useState(false)
 
   const run = (fn: () => Promise<unknown>) => {
     setErr(null)
@@ -58,11 +57,21 @@ export function ActionFeedback({
     })
   }
 
+  const copyMsg = async () => {
+    if (!messageDraft) return
+    try {
+      await navigator.clipboard.writeText(messageDraft)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } catch (e) {
+      console.error('[copy]', e)
+    }
+  }
+
   const executed = status === 'executed'
   const cancelled = status === 'cancelled'
   const settled = executed || cancelled || hasOutcome
 
-  // ── 결과 입력 폼 ────────────────────────────────
   if (mode === 'outcome') {
     return (
       <div className="flex flex-col gap-2 p-3 rounded-xl border border-accent/30 bg-accent/5">
@@ -109,7 +118,7 @@ export function ActionFeedback({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => run(() => markActionExecutedAction(actionId))}
+            onClick={() => run(() => recordManualOutcomeAction({ actionId, narrative: '(기록 생략)', goalProgress: 'unclear' }))}
             disabled={pending}
             className="flex-1 py-2 text-xs rounded-lg border border-border text-muted disabled:opacity-60"
           >
@@ -136,16 +145,15 @@ export function ActionFeedback({
     )
   }
 
-  // ── settled 요약 ────────────────────────────────
   if (settled) {
     const label = cancelled
-      ? '안 함'
+      ? '· 패스됨'
       : hasOutcome
-      ? '실행 + 결과 기록됨'
-      : '실행됨 · 결과 미기록'
+      ? '· 보냄 + 결과 기록됨'
+      : '· 보냄'
     return (
       <div className="flex items-center justify-between text-[11px] text-muted px-1">
-        <span>· {label}</span>
+        <span>{label}</span>
         {executed && !hasOutcome && (
           <button
             type="button"
@@ -159,18 +167,25 @@ export function ActionFeedback({
     )
   }
 
-  // ── 초기 2버튼 ──────────────────────────────────
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-[11px] text-muted px-1">실행했어?</div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={copyMsg}
+          disabled={pending || !messageDraft}
+          className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-border bg-surface-2 text-xs font-semibold disabled:opacity-40 hover:border-accent/40"
+        >
+          {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
+          {copied ? '복사됨' : '복사'}
+        </button>
         <button
           type="button"
           onClick={() => setMode('outcome')}
           disabled={pending}
           className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-good/40 bg-good/5 text-good text-xs font-semibold hover:bg-good/10 disabled:opacity-60"
         >
-          <Check size={14} /> 했음
+          <Check size={14} /> 보냄
         </button>
         <button
           type="button"
@@ -178,7 +193,7 @@ export function ActionFeedback({
           disabled={pending}
           className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-border bg-surface-2 text-muted text-xs font-semibold hover:bg-surface-3 disabled:opacity-60"
         >
-          <X size={14} /> 안 했음
+          <X size={14} /> 패스
         </button>
       </div>
       {err && (
