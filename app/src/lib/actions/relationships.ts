@@ -100,36 +100,46 @@ export async function updateRelationship(
     'escalationSpeed' | 'status'
   >>
 ): Promise<void> {
-  await ensureSchema()
+  try {
+    await ensureSchema()
 
-  // stage 전이 감지 — progress 가 실제로 바뀌면 stageHistory 에 append
-  let stageHistoryUpdate: Array<{ stage: string; at: number }> | undefined
-  if (patch.progress !== undefined) {
-    const [prev] = await db
-      .select()
-      .from(relationships)
-      .where(eq(relationships.id, id))
-      .limit(1)
-    if (prev && prev.progress !== patch.progress) {
-      const hist = Array.isArray(prev.stageHistory) ? prev.stageHistory : []
-      stageHistoryUpdate = [...hist, { stage: patch.progress, at: Date.now() }]
+    // stage 전이 감지 — progress 가 실제로 바뀌면 stageHistory 에 append
+    let stageHistoryUpdate: Array<{ stage: string; at: number }> | undefined
+    if (patch.progress !== undefined) {
+      const [prev] = await db
+        .select()
+        .from(relationships)
+        .where(eq(relationships.id, id))
+        .limit(1)
+      if (prev && prev.progress !== patch.progress) {
+        const hist = Array.isArray(prev.stageHistory) ? prev.stageHistory : []
+        stageHistoryUpdate = [...hist, { stage: patch.progress, at: Date.now() }]
+      }
     }
-  }
 
-  const updates: Partial<Relationship> & { updatedAt: Date } = {
-    ...patch,
-    updatedAt: new Date(),
-  }
-  if (stageHistoryUpdate) {
-    (updates as Relationship).stageHistory = stageHistoryUpdate
-  }
+    const updates: Record<string, unknown> = {
+      ...patch,
+      updatedAt: new Date(),
+    }
+    if (stageHistoryUpdate) {
+      updates.stageHistory = stageHistoryUpdate
+    }
 
-  await db
-    .update(relationships)
-    .set(updates)
-    .where(eq(relationships.id, id))
-  revalidatePath('/')
-  revalidatePath(`/r/${id}`)
+    await db
+      .update(relationships)
+      .set(updates)
+      .where(eq(relationships.id, id))
+    revalidatePath('/')
+    revalidatePath(`/r/${id}`)
+  } catch (e) {
+    console.error('[updateRelationship]', {
+      id,
+      patch,
+      error: (e as Error).message,
+      stack: (e as Error).stack,
+    })
+    throw e
+  }
 }
 
 export async function updatePartner(

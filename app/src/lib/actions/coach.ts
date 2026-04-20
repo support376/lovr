@@ -16,9 +16,20 @@ export async function proposeStrategyAction(input: {
   goalId: string
   currentSituation: string
 }) {
-  const result = await engine.proposeStrategy(input)
-  revalidatePath(`/r/${input.relationshipId}`)
-  return result
+  try {
+    const result = await engine.proposeStrategy(input)
+    revalidatePath(`/r/${input.relationshipId}`)
+    return result
+  } catch (e) {
+    console.error('[proposeStrategyAction]', {
+      input,
+      error: (e as Error).message,
+      stack: (e as Error).stack,
+    })
+    throw new Error(
+      `전략 생성 실패: ${(e as Error).message ?? 'unknown'}`
+    )
+  }
 }
 
 export async function analyzeOutcomeAction(actionId: string) {

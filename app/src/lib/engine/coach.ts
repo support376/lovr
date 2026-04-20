@@ -111,16 +111,27 @@ ${goal.category} — ${goal.description}
       : { status: 'ok' as const, results: [], applicableLaws: [] }
 
   const id = `act-${randomUUID()}`
-  await db.insert(actionsTbl).values({
-    id,
-    relationshipId: params.relationshipId,
-    goalId: goal.id,
-    source: 'ai_proposed',
-    content: markdown,
-    status: 'proposed',
-    ethicsStatus: actionEval.status,
-    ethicsReasons: actionEval.results.map((r) => `[${r.ruleId}] ${r.reason}`),
-  })
+  try {
+    await db.insert(actionsTbl).values({
+      id,
+      relationshipId: params.relationshipId,
+      goalId: goal.id,
+      source: 'ai_proposed',
+      content: markdown,
+      status: 'proposed',
+      ethicsStatus: actionEval.status,
+      ethicsReasons: actionEval.results.map((r) => `[${r.ruleId}] ${r.reason}`),
+    })
+  } catch (e) {
+    console.error('[proposeStrategy insert]', {
+      id,
+      relationshipId: params.relationshipId,
+      goalId: goal.id,
+      markdownLen: markdown.length,
+      error: (e as Error).message,
+    })
+    throw e
+  }
 
   return { actionId: id, markdown, ethicsStatus: actionEval.status }
 }
