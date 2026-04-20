@@ -73,6 +73,7 @@ export async function ensureSchema() {
   `)
   await tryAdd('relationships', 'description', 'TEXT')
   await tryAdd('relationships', 'style', 'TEXT')
+  await tryAdd('relationships', 'stage_history', "TEXT NOT NULL DEFAULT '[]'")
 
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS events (
@@ -198,6 +199,37 @@ async function migrateOntologyV2() {
     const mapped = LEGACY_STAGE_MAP[current] ?? 'pre_match'
     await db.run(
       sql`UPDATE relationships SET progress = ${mapped} WHERE id = ${r.id}`
+    )
+  }
+
+  // stage_history backfill — 비어있는 row 는 현재 progress + createdAt 를 시드
+  const relsWithHistory = await db.all<{
+    id: string
+    progress: string
+    created_at: number
+    stage_history: string
+  }>(
+    sql`SELECT id, progress, created_at, stage_history FROM relationships`
+  )
+  for (const r of relsWithHistory as Array<{
+    id: string
+    progress: string
+    created_at: number
+    stage_history: string
+  }>) {
+    let history: Array<{ stage: string; at: number }>
+    try {
+      history = JSON.parse(r.stage_history || '[]')
+    } catch {
+      history = []
+    }
+    if (Array.isArray(history) && history.length > 0) continue
+
+    const seed = JSON.stringify([
+      { stage: r.progress, at: Number(r.created_at) },
+    ])
+    await db.run(
+      sql`UPDATE relationships SET stage_history = ${seed} WHERE id = ${r.id}`
     )
   }
 

@@ -10,7 +10,8 @@ import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
-import { STAGES, GOALS } from '@/lib/ontology'
+import { StagePicker } from './StagePicker'
+import { GOALS } from '@/lib/ontology'
 
 export default async function RelationshipPage({
   params,
@@ -51,18 +52,24 @@ export default async function RelationshipPage({
     : []
   const hasOutcome = outs.length > 0
 
-  const stageLabel =
-    rel.progress && STAGES[rel.progress as keyof typeof STAGES]
-      ? STAGES[rel.progress as keyof typeof STAGES].ko
-      : null
   const goalLabel = primaryGoal
     ? GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ??
       primaryGoal.category
     : null
 
+  // 현재 stage 가 얼마나 지속 중인지 (마지막 전이 시점부터)
+  const stageHistory = Array.isArray(rel.stageHistory) ? rel.stageHistory : []
+  const lastTransition = stageHistory[stageHistory.length - 1]
+  const daysSinceStage = lastTransition
+    ? Math.max(
+        0,
+        Math.floor((Date.now() - Number(lastTransition.at)) / 86400000)
+      )
+    : null
+
   return (
     <>
-      {/* 1줄 축약 헤더: 이름 · stage · MBTI · 상세 */}
+      {/* 1줄 축약 헤더: 이름(나이) · MBTI · 상세 */}
       <header className="px-5 pt-4 pb-2 flex items-center gap-2">
         <h1 className="text-lg font-bold truncate flex-1 min-w-0">
           {rel.partner.displayName}
@@ -71,11 +78,6 @@ export default async function RelationshipPage({
               ({rel.partner.age})
             </span>
           ) : null}
-          {stageLabel && (
-            <span className="ml-2 text-[11px] text-accent font-medium">
-              · {stageLabel}
-            </span>
-          )}
           {rel.partner.mbti && (
             <span className="ml-2 text-[11px] text-muted font-mono">
               · {rel.partner.mbti}
@@ -85,11 +87,17 @@ export default async function RelationshipPage({
         <DetailsToggle open={editOpen} relationshipId={id} />
       </header>
 
-      {/* 맥락 배지 — 목표만. 탭하면 /goals */}
-      <div className="px-5 pb-2">
+      {/* 맥락 배지 — Stage (왼쪽) + Goal (오른쪽). 둘 다 즉시 변경. */}
+      <div className="px-5 pb-2 flex items-center gap-2 flex-wrap">
+        <StagePicker relationshipId={id} current={rel.progress} />
+        {daysSinceStage !== null && daysSinceStage > 0 && (
+          <span className="text-[10px] text-muted">
+            · {daysSinceStage}일째
+          </span>
+        )}
         <Link
           href={`/r/${id}/goals`}
-          className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-border bg-surface-2 hover:border-accent/40"
+          className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-border bg-surface-2 hover:border-accent/40"
         >
           <span className="text-muted">🎯</span>
           <span className={goalLabel ? 'text-accent font-medium' : 'text-muted'}>

@@ -110,6 +110,15 @@ export const relationships = sqliteTable('relationships', {
 
   timelineStart: integer('timeline_start', { mode: 'timestamp_ms' }),
   status: text('status').notNull().default('active'), // 'active' | 'paused' | 'ended'
+
+  /**
+   * Stage 전이 로그. append-only. 첫 연락 / 초기 / 안정 전환 시각 기록.
+   * 사이 시간이 관계 밀도·속도의 신호.
+   */
+  stageHistory: text('stage_history', { mode: 'json' })
+    .$type<Array<{ stage: string; at: number }>>()
+    .notNull()
+    .default(sql`'[]'`),
 })
 
 // ============================================================================

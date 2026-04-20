@@ -75,13 +75,16 @@ export async function createRelationship(input: {
     inferredTraits: [],
   })
 
+  const initialStage = input.progress ?? 'pre_match'
+  const now = Date.now()
   await db.insert(relationships).values({
     id: relId,
     partnerId,
-    progress: input.progress ?? 'observing',
+    progress: initialStage,
     exclusivity: input.exclusivity ?? 'unknown',
     conflictState: 'healthy',
     status: 'active',
+    stageHistory: [{ stage: initialStage, at: now }],
   })
 
   revalidatePath('/')
@@ -98,9 +101,32 @@ export async function updateRelationship(
   >>
 ): Promise<void> {
   await ensureSchema()
+
+  // stage 전이 감지 — progress 가 실제로 바뀌면 stageHistory 에 append
+  let stageHistoryUpdate: Array<{ stage: string; at: number }> | undefined
+  if (patch.progress !== undefined) {
+    const [prev] = await db
+      .select()
+      .from(relationships)
+      .where(eq(relationships.id, id))
+      .limit(1)
+    if (prev && prev.progress !== patch.progress) {
+      const hist = Array.isArray(prev.stageHistory) ? prev.stageHistory : []
+      stageHistoryUpdate = [...hist, { stage: patch.progress, at: Date.now() }]
+    }
+  }
+
+  const updates: Partial<Relationship> & { updatedAt: Date } = {
+    ...patch,
+    updatedAt: new Date(),
+  }
+  if (stageHistoryUpdate) {
+    (updates as Relationship).stageHistory = stageHistoryUpdate
+  }
+
   await db
     .update(relationships)
-    .set({ ...patch, updatedAt: new Date() })
+    .set(updates)
     .where(eq(relationships.id, id))
   revalidatePath('/')
   revalidatePath(`/r/${id}`)
