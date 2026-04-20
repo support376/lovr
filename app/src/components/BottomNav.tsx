@@ -8,7 +8,7 @@ const items = [
   { href: '/', label: 'LuvAI', icon: Sparkles, match: (p: string) => p === '/' },
   {
     href: '/r',
-    label: '관계',
+    label: '전략',
     icon: Heart,
     match: (p: string) => p === '/r' || p.startsWith('/r/'),
   },
@@ -20,7 +20,7 @@ const items = [
   },
   {
     href: '/me',
-    label: '설정',
+    label: 'MY',
     icon: Settings,
     match: (p: string) => p.startsWith('/me'),
   },

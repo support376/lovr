@@ -12,7 +12,7 @@ import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
 import { PartnerInlineEditor } from '@/app/r/[id]/PartnerInlineEditor'
-import { SelfSummaryPanel } from './SelfSummaryPanel'
+import { TargetSwitcherCards } from './TargetSwitcherCards'
 
 export default async function TimelinePage({
   searchParams,
@@ -33,7 +33,7 @@ export default async function TimelinePage({
     <>
       <PageHeader
         title="기록"
-        subtitle="상대 · 나 · 대화 · 메모 전부 여기서"
+        subtitle="상대별 프로필 · 대화 · 메모"
         right={
           <Link
             href="/r/new"
@@ -46,61 +46,51 @@ export default async function TimelinePage({
       />
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {/* Self 는 관계 유무 무관 항상 노출 */}
-        <SelfSummaryPanel self={self} />
-
-        {!focused ? (
+        {all.length === 0 ? (
           <Empty
-            title="등록된 관계 없음"
-            subtitle="관계를 추가하면 상대 프로필 · 대화 · 메모를 여기서 쌓을 수 있어."
+            title="등록된 상대 없음"
+            subtitle="상대를 추가하면 프로필 · 대화 · 메모를 여기서 쌓을 수 있어."
             action={
               <Link href="/r/new">
-                <Button>첫 관계 등록</Button>
+                <Button>
+                  <Plus size={16} /> 첫 상대 등록
+                </Button>
               </Link>
             }
           />
         ) : (
           <>
-            {all.length > 1 && (
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                {all.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/timeline?rel=${r.id}`}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border ${
-                      r.id === focused!.id
-                        ? 'bg-accent/15 border-accent/40 text-accent'
-                        : 'bg-surface-2 border-border text-muted'
-                    }`}
-                  >
-                    {r.partner.displayName}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <TargetSwitcherCards
+              relationships={all}
+              focusedId={focused?.id ?? null}
+            />
 
-            <PartnerInlineEditor rel={focused} showToggleButton={true} />
+            {focused && (
+              <>
+                <PartnerInlineEditor rel={focused} showToggleButton={true} />
 
-            <AddEventForm relationshipId={focused.id} />
+                <AddEventForm relationshipId={focused.id} />
 
-            <section>
-              <div className="text-xs text-muted uppercase tracking-wider mb-2">
-                타임라인 ({events.length})
-              </div>
-              {events.length === 0 ? (
-                <Card>
-                  <div className="text-sm text-muted">
-                    아직 기록 없음. 위에서 추가하자.
+                <section>
+                  <div className="text-xs text-muted uppercase tracking-wider mb-2">
+                    타임라인 ({events.length})
                   </div>
-                </Card>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {events.map((e) => (
-                    <EventCard key={e.id} e={e} />
-                  ))}
-                </div>
-              )}
-            </section>
+                  {events.length === 0 ? (
+                    <Card>
+                      <div className="text-sm text-muted">
+                        아직 기록 없음. 위에서 추가하자.
+                      </div>
+                    </Card>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {events.map((e) => (
+                        <EventCard key={e.id} e={e} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>
