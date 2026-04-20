@@ -3,6 +3,7 @@ import { getSelf } from '@/lib/actions/self'
 import { PageHeader } from '@/components/ui'
 import { SelfForm } from './SelfForm'
 import { BillingMock } from './Billing'
+import { SeedControls } from './SeedControls'
 
 export default async function SettingsPage() {
   const self = await getSelf()
@@ -24,6 +25,13 @@ export default async function SettingsPage() {
             결제
           </div>
           <BillingMock />
+        </section>
+
+        <section>
+          <div className="text-xs text-muted uppercase tracking-wider mb-2">
+            목업 데이터 (UI 검증)
+          </div>
+          <SeedControls />
         </section>
       </div>
     </>
