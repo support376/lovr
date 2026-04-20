@@ -11,6 +11,7 @@ import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
+import { PartnerInlineEditor } from '@/app/r/[id]/PartnerInlineEditor'
 
 export default async function TimelinePage({
   searchParams,
@@ -33,7 +34,7 @@ export default async function TimelinePage({
         title="기록"
         subtitle={
           focused
-            ? `${focused.partner.displayName} · Event 추가하면 LuvAI가 다음에 맥락으로 씀`
+            ? '상대 정보 · 대화 · 메모 전부 여기서'
             : '먼저 관계를 등록해야 Event를 쌓을 수 있어'
         }
         right={
@@ -51,7 +52,7 @@ export default async function TimelinePage({
         {!focused ? (
           <Empty
             title="등록된 관계 없음"
-            subtitle="관계를 추가하면 여기서 대화·만남·메모를 쌓을 수 있어."
+            subtitle="관계를 추가하면 여기서 상대 정보 · 대화 · 메모를 쌓을 수 있어."
             action={
               <Link href="/r/new">
                 <Button>첫 관계 등록</Button>
@@ -77,6 +78,9 @@ export default async function TimelinePage({
                 ))}
               </div>
             )}
+
+            {/* 상대 프로필 — 접힘 기본. 입력 UI 는 모두 여기 */}
+            <PartnerInlineEditor rel={focused} showToggleButton={true} />
 
             <AddEventForm relationshipId={focused.id} />
 

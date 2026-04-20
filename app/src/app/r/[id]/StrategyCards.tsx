@@ -12,11 +12,6 @@ type Props = {
   hasOutcome: boolean
 }
 
-/**
- * 관계 화면의 행동 영역.
- *   - Primary (1번) 만 전체 펼침. 타이밍 · 타이틀 · 메시지 초안 · [복사/보냄/패스] · 왜(접힘)
- *   - Secondary (2·3번) 은 축약 카드. 탭하면 확장.
- */
 export function StrategyCards({ action, hasOutcome }: Props) {
   const { strategies } = parseStrategyBundle(action.content)
 
@@ -26,8 +21,7 @@ export function StrategyCards({ action, hasOutcome }: Props) {
         <details className="rounded-xl border border-border bg-surface/50 p-3 [&_summary::-webkit-details-marker]:hidden">
           <summary className="cursor-pointer list-none text-[11px] text-muted flex items-center gap-1">
             <span>▸</span>
-            {new Date(action.createdAt).toLocaleDateString('ko-KR')} · 파싱 실패
-            — 원문 보기
+            원문
           </summary>
           <div className="mt-2 text-xs text-muted whitespace-pre-wrap leading-relaxed">
             {fallbackSummary(action.content, 2000)}
@@ -55,9 +49,6 @@ export function StrategyCards({ action, hasOutcome }: Props) {
 
       {rest.length > 0 && (
         <div className="flex flex-col gap-2">
-          <div className="text-[10px] text-muted uppercase tracking-wider px-1">
-            다음 안
-          </div>
           {rest.map((s) => (
             <SecondaryStrategyCard key={s.label} s={s} />
           ))}
@@ -81,19 +72,23 @@ function PrimaryStrategyBlock({
   const whyBody = [strategy.rationale, strategy.why].filter(Boolean).join('\n\n')
 
   return (
-    <div className="rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/5 via-surface to-surface p-4 flex flex-col gap-3">
+    <div className="rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/10 via-surface to-surface p-5 flex flex-col gap-4">
       {strategy.timing && (
-        <div className="text-[11px] text-accent font-semibold">
-          ⏱ {strategy.timing}
+        <div className="inline-flex items-center self-start text-[11px] text-accent font-semibold px-2 py-0.5 rounded-full bg-accent/15">
+          {strategy.timing}
         </div>
       )}
 
-      <div className="text-[17px] font-bold leading-snug">{strategy.title}</div>
+      <h2 className="text-2xl font-black tracking-tight leading-[1.15]">
+        {strategy.title}
+      </h2>
 
       {strategy.messageDraft && (
-        <div className="rounded-xl bg-surface-2 border border-border p-3">
-          <div className="text-[10px] text-accent mb-1 uppercase">메시지 초안</div>
-          <div className="text-sm whitespace-pre-wrap leading-relaxed">
+        <div className="rounded-xl bg-surface-2 border border-border p-4">
+          <div className="text-[10px] text-accent mb-1.5 uppercase tracking-wider font-semibold">
+            메시지
+          </div>
+          <div className="text-[15px] whitespace-pre-wrap leading-relaxed">
             {strategy.messageDraft}
           </div>
         </div>
@@ -108,11 +103,11 @@ function PrimaryStrategyBlock({
 
       {whyBody && (
         <details className="group [&_summary::-webkit-details-marker]:hidden">
-          <summary className="cursor-pointer list-none text-[11px] text-muted flex items-center gap-1">
+          <summary className="cursor-pointer list-none text-[11px] text-muted flex items-center gap-1 hover:text-accent">
             <span className="group-open:rotate-90 transition-transform">▸</span>
-            왜 이 액션?
+            왜
           </summary>
-          <div className="mt-2 text-xs text-muted whitespace-pre-wrap leading-relaxed">
+          <div className="mt-2 text-xs text-muted whitespace-pre-wrap leading-relaxed pl-3">
             {whyBody}
           </div>
         </details>
