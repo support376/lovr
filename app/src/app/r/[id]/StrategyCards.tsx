@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import type { Action } from '@/lib/db/schema'
 import {
   parseStrategyBundle,
@@ -18,27 +17,22 @@ type Props = {
  *   - Primary (1번) 만 전체 펼침. 타이밍 · 타이틀 · 메시지 초안 · [복사/보냄/패스] · 왜(접힘)
  *   - Secondary (2·3번) 은 축약 카드. 탭하면 확장.
  */
-export function StrategyCards({
-  action,
-  relationshipId,
-  hasOutcome,
-}: Props) {
+export function StrategyCards({ action, hasOutcome }: Props) {
   const { strategies } = parseStrategyBundle(action.content)
 
   if (strategies.length === 0) {
     return (
       <div className="flex flex-col gap-3">
-        <Link
-          href={`/r/${relationshipId}/action/${action.id}`}
-          className="rounded-xl border border-border bg-surface/50 p-3 hover:border-accent/50 transition-colors"
-        >
-          <div className="text-[11px] text-muted mb-1">
-            {new Date(action.createdAt).toLocaleDateString('ko-KR')} · 파싱 실패 — 원문 보기
+        <details className="rounded-xl border border-border bg-surface/50 p-3 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="cursor-pointer list-none text-[11px] text-muted flex items-center gap-1">
+            <span>▸</span>
+            {new Date(action.createdAt).toLocaleDateString('ko-KR')} · 파싱 실패
+            — 원문 보기
+          </summary>
+          <div className="mt-2 text-xs text-muted whitespace-pre-wrap leading-relaxed">
+            {fallbackSummary(action.content, 2000)}
           </div>
-          <div className="text-xs text-muted line-clamp-3 whitespace-pre-wrap leading-relaxed">
-            {fallbackSummary(action.content)}
-          </div>
-        </Link>
+        </details>
         <ActionFeedback
           actionId={action.id}
           status={action.status}
@@ -69,13 +63,6 @@ export function StrategyCards({
           ))}
         </div>
       )}
-
-      <Link
-        href={`/r/${relationshipId}/action/${action.id}`}
-        className="text-[11px] text-muted hover:text-accent self-end"
-      >
-        전체 원문 →
-      </Link>
     </div>
   )
 }
@@ -101,9 +88,7 @@ function PrimaryStrategyBlock({
         </div>
       )}
 
-      <div className="text-[17px] font-bold leading-snug">
-        {strategy.title}
-      </div>
+      <div className="text-[17px] font-bold leading-snug">{strategy.title}</div>
 
       {strategy.messageDraft && (
         <div className="rounded-xl bg-surface-2 border border-border p-3">

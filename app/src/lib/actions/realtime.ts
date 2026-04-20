@@ -28,7 +28,6 @@ async function loadOntologyBlockForCurrent(): Promise<string> {
   return promptContextBlock({
     stage: cur.progress,
     goal: primary?.category ?? null,
-    style: cur.style,
   })
 }
 

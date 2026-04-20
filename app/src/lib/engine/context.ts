@@ -122,11 +122,7 @@ function renderMarkdown(c: {
   lines.push('## [현재 관계]')
   if (c.relationship && c.partner) {
     lines.push(`- 상대: ${c.partner.displayName}`)
-    lines.push(`- 단계: ${c.relationship.progress} / 독점: ${c.relationship.exclusivity} / 갈등: ${c.relationship.conflictState}`)
-    if (c.relationship.powerBalance) lines.push(`- 힘의 균형: ${c.relationship.powerBalance}`)
-    if (c.relationship.communicationPattern) lines.push(`- 연락 패턴: ${c.relationship.communicationPattern}`)
-    if (c.relationship.investmentAsymmetry) lines.push(`- 투자 비대칭: ${c.relationship.investmentAsymmetry}`)
-    if (c.relationship.escalationSpeed) lines.push(`- 심화 속도: ${c.relationship.escalationSpeed}`)
+    lines.push(`- 단계: ${c.relationship.progress}`)
     if ((c.partner.knownConstraints ?? []).length > 0) {
       lines.push(`- 상대 제약: ${c.partner.knownConstraints!.join(', ')}`)
     }

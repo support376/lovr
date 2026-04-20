@@ -57,20 +57,11 @@ export async function proposeStrategy(params: {
   const ontologyBlock = promptContextBlock({
     stage: ctx.relationship?.progress ?? null,
     goal: goal.category,
-    style: ctx.relationship?.style ?? null,
   })
-  const candidatePlays = findPlays({
+  const plays = findPlays({
     stage: ctx.relationship?.progress ?? null,
     goal: goal.category,
-    style: ctx.relationship?.style ?? null,
   })
-  const plays =
-    candidatePlays.length > 0
-      ? candidatePlays
-      : findPlays({
-          stage: ctx.relationship?.progress ?? null,
-          goal: goal.category,
-        })
   const playsBlock = playsPromptBlock(plays)
 
   const userMsg = `${ctx.markdown}
@@ -85,7 +76,7 @@ ${params.currentSituation}
 ## [목표]
 ${goal.category} — ${goal.description}
 
-전략 3안 출력. 반드시 [답변 스타일]의 톤·언어·실패 모드를 따를 것.`
+전략 3안 출력.`
 
   const res = await client.messages.create({
     model: MODEL,

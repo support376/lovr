@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
@@ -11,7 +10,7 @@ import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
 import { StagePicker } from './StagePicker'
-import { GOALS } from '@/lib/ontology'
+import { GoalPicker } from './GoalPicker'
 
 export default async function RelationshipPage({
   params,
@@ -52,11 +51,6 @@ export default async function RelationshipPage({
     : []
   const hasOutcome = outs.length > 0
 
-  const goalLabel = primaryGoal
-    ? GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ??
-      primaryGoal.category
-    : null
-
   // 현재 stage 가 얼마나 지속 중인지 (마지막 전이 시점부터)
   const stageHistory = Array.isArray(rel.stageHistory) ? rel.stageHistory : []
   const lastTransition = stageHistory[stageHistory.length - 1]
@@ -87,7 +81,7 @@ export default async function RelationshipPage({
         <DetailsToggle open={editOpen} relationshipId={id} />
       </header>
 
-      {/* 맥락 배지 — Stage (왼쪽) + Goal (오른쪽). 둘 다 큰 버튼. */}
+      {/* 맥락 배지 — Stage (왼쪽) + Goal (오른쪽). 둘 다 같은 inline dropdown. */}
       <div className="px-5 pb-3 flex items-start gap-2">
         <div className="flex flex-col gap-0.5">
           <StagePicker relationshipId={id} current={rel.progress} />
@@ -97,22 +91,14 @@ export default async function RelationshipPage({
             </span>
           )}
         </div>
-        <Link
-          href={`/r/${id}/goals`}
-          className="ml-auto inline-flex items-center gap-2 text-sm px-3.5 py-2 rounded-xl border border-border bg-surface-2 hover:border-accent/40"
-        >
-          <span className="text-[10px] text-muted uppercase tracking-wider">목표</span>
-          <span
-            className={
-              goalLabel
-                ? 'text-accent font-bold'
-                : 'text-muted font-medium'
-            }
-          >
-            {goalLabel ?? '미설정'}
-          </span>
-          <span className="text-muted text-xs">▾</span>
-        </Link>
+        <div className="ml-auto">
+          <GoalPicker
+            relationshipId={id}
+            partnerId={rel.partner.id}
+            stage={rel.progress}
+            currentGoalCategory={primaryGoal?.category ?? null}
+          />
+        </div>
       </div>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">

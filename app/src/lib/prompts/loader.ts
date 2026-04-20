@@ -170,46 +170,7 @@ const REALTIME_MID = `당신은 LuvOS 실시간 코칭의 Mid Layer 입니다. 1
 **다음 수**: [구체 행동 1개, 한 줄]
 \`\`\``
 
-const STATE_INFERENCE = `당신은 LuvOS의 관계 상태 추론기입니다. 주어진 Event 타임라인 + 상대 명목 정보 + active Goals를 읽고, **관계의 현재 stage 와 dynamics**를 자연어로 추론합니다.
-
-## 원칙
-1. **증거 기반**. Event에 근거 없는 추정 금지. 불확실하면 기존값 유지.
-2. 관계 진행도 = "현재 실제 상태" (Goal과 분리).
-3. **자연어 필드는 구체적 관찰 1~2문장**.
-4. Event 적으면 대부분 필드 비워라.
-5. 기존 값과 크게 다르면 근거 명시.
-
-## 출력 — **반드시 JSON 한 덩어리**, 코드펜스 없이
-
-{
-  "progress": "pre_match|first_contact|sseom|dating_early|dating_stable|conflict|reconnection",
-  "exclusivity": "unknown|open|exclusive|married",
-  "conflictState": "healthy|tension|conflict|recovery",
-  "powerBalance": "자연어 1문장 or 빈 문자열",
-  "communicationPattern": "자연어 1문장 or 빈 문자열",
-  "investmentAsymmetry": "자연어 1문장 or 빈 문자열",
-  "escalationSpeed": "자연어 1문장 or 빈 문자열",
-  "rationale": "주요 판단 근거 2~4줄"
-}
-
-## 필드 정의
-- progress:
-  - pre_match — 아직 매칭 안 됨, 프로필만 봄
-  - first_contact — 첫 메시지 ~ 첫 만남 전
-  - sseom — 썸 (만났고 관심 있지만 미정)
-  - dating_early — 사귀는 초반 1~3개월
-  - dating_stable — 안정기
-  - conflict — 갈등 중
-  - reconnection — 재연결 시도
-- exclusivity: 독점 배타성. married는 유저 자신 기혼.
-- conflictState: 갈등 국면.
-- powerBalance/communicationPattern/investmentAsymmetry/escalationSpeed: 자연어 관찰.
-
-## 주의
-- JSON만. 앞뒤 설명·코드펜스 금지.
-- 키 이름 정확히.`
-
-const SELF_QUIZ = `당신은 LuvOS의 자기 프로파일 추출기입니다. 유저 답변을 읽고 **자연어 프로파일 narrative**를 JSON으로 산출합니다.
+const SELF_QUIZ =`당신은 LuvOS의 자기 프로파일 추출기입니다. 유저 답변을 읽고 **자연어 프로파일 narrative**를 JSON으로 산출합니다.
 
 ## 원칙
 1. **답변 근거로만**. 과도한 추측·심리학 용어 금지.
@@ -252,9 +213,6 @@ export function outcomeAnalysisPrompt(): string {
 }
 export function weeklyReportPrompt(): string {
   return WEEKLY_REPORT
-}
-export function stateInferencePrompt(): string {
-  return STATE_INFERENCE
 }
 export function selfQuizPrompt(): string {
   return SELF_QUIZ
