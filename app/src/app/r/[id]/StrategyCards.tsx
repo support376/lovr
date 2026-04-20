@@ -6,6 +6,7 @@ import {
   fallbackSummary,
   type ParsedStrategy,
 } from '@/lib/strategies/parse'
+import { ActionFeedback } from './ActionFeedback'
 
 type Props = {
   action: Action
@@ -18,22 +19,29 @@ export function StrategyCards({ action, relationshipId, hasOutcome }: Props) {
 
   if (strategies.length === 0) {
     return (
-      <Link href={`/r/${relationshipId}/action/${action.id}`}>
-        <Card className="hover:border-accent/60 transition-colors">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Pill tone={action.status === 'accepted' ? 'good' : 'accent'}>
-              {action.status === 'accepted' ? '채택됨' : '제안됨'}
-            </Pill>
-            {hasOutcome && <Pill tone="neutral">결과 있음</Pill>}
-            <span className="text-[10px] text-muted ml-auto">
-              {new Date(action.createdAt).toLocaleDateString('ko-KR')}
-            </span>
-          </div>
-          <div className="text-xs text-muted line-clamp-3 whitespace-pre-wrap leading-relaxed">
-            {fallbackSummary(action.content)}
-          </div>
-        </Card>
-      </Link>
+      <div className="flex flex-col gap-3">
+        <Link href={`/r/${relationshipId}/action/${action.id}`}>
+          <Card className="hover:border-accent/60 transition-colors">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Pill tone={action.status === 'accepted' ? 'good' : 'accent'}>
+                {action.status === 'accepted' ? '채택됨' : '제안됨'}
+              </Pill>
+              {hasOutcome && <Pill tone="neutral">결과 있음</Pill>}
+              <span className="text-[10px] text-muted ml-auto">
+                {new Date(action.createdAt).toLocaleDateString('ko-KR')}
+              </span>
+            </div>
+            <div className="text-xs text-muted line-clamp-3 whitespace-pre-wrap leading-relaxed">
+              {fallbackSummary(action.content)}
+            </div>
+          </Card>
+        </Link>
+        <ActionFeedback
+          actionId={action.id}
+          status={action.status}
+          hasOutcome={hasOutcome}
+        />
+      </div>
     )
   }
 
@@ -65,6 +73,13 @@ export function StrategyCards({ action, relationshipId, hasOutcome }: Props) {
       {strategies.map((s) => (
         <StrategyCard key={s.label} s={s} />
       ))}
+
+      {/* closed-loop 3버튼 */}
+      <ActionFeedback
+        actionId={action.id}
+        status={action.status}
+        hasOutcome={hasOutcome}
+      />
     </div>
   )
 }

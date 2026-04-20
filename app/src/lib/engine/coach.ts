@@ -226,6 +226,58 @@ export async function markActionExecuted(actionId: string): Promise<void> {
 }
 
 /**
+ * Action 을 실행 안 함으로 처리 (유저가 "안 했음" 선택).
+ */
+export async function markActionCancelled(actionId: string): Promise<void> {
+  await ensureSchema()
+  await db
+    .update(actionsTbl)
+    .set({ status: 'cancelled' })
+    .where(eq(actionsTbl.id, actionId))
+}
+
+/**
+ * 유저가 직접 기록하는 outcome (LLM 사용 안 함).
+ * closed-loop 최소 착수: action 실행 후 한 줄 narrative + 4단 진행도.
+ */
+export async function recordManualOutcome(params: {
+  actionId: string
+  narrative: string
+  goalProgress: 'advanced' | 'stagnant' | 'regressed' | 'unclear'
+}): Promise<{ outcomeId: string }> {
+  await ensureSchema()
+  const [action] = await db
+    .select()
+    .from(actionsTbl)
+    .where(eq(actionsTbl.id, params.actionId))
+    .limit(1)
+  if (!action) throw new Error('Action not found')
+
+  // executed 아직 아니면 같이 executed 로 올림
+  if (action.status !== 'executed') {
+    await db
+      .update(actionsTbl)
+      .set({ status: 'executed', executedAt: new Date() })
+      .where(eq(actionsTbl.id, params.actionId))
+  }
+
+  const id = `out-${randomUUID()}`
+  await db.insert(outcomes).values({
+    id,
+    actionId: params.actionId,
+    observedSignals: '(manual entry)',
+    relatedEventIds: [],
+    goalProgress: params.goalProgress,
+    surpriseLevel: 'expected',
+    narrative: params.narrative,
+    lessons: [],
+    triggeredActionIds: [],
+  })
+
+  return { outcomeId: id }
+}
+
+/**
  * 주간 리포트 (ontology 3.5).
  * 지난 7일 event/action/outcome을 받아 Insight 초안 생성.
  */

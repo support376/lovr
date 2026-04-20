@@ -13,6 +13,10 @@ import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
 import { STAGES, GOALS } from '@/lib/ontology'
+import {
+  canAccessMultiTargetReport,
+  getCurrentTier,
+} from '@/lib/billing/tier'
 
 export default async function RelationshipPage({
   params,
@@ -153,24 +157,64 @@ export default async function RelationshipPage({
           )}
         </section>
 
-        {/* 3. 다면 관계 리포트 */}
-        <section>
-          <Link href={`/r/${id}/report`}>
-            <Card className="border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors">
-              <div className="flex items-start gap-3">
-                <Lock size={16} className="text-warn mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">다면 관계 리포트</div>
-                  <div className="text-[11px] text-muted mt-0.5 leading-relaxed">
-                    지금까지의 전 기록 통합 인사이트 · 패턴 · 장기 경고. (베타 무료)
-                  </div>
-                </div>
-                <span className="text-xs text-warn shrink-0">받기 →</span>
-              </div>
-            </Card>
-          </Link>
-        </section>
+        {/* 3. 다면 관계 리포트 — Deep tier 전용 */}
+        <MultiTargetReportCTA relationshipId={id} />
       </div>
     </>
   )
 }
+
+function MultiTargetReportCTA({ relationshipId }: { relationshipId: string }) {
+  const tier = getCurrentTier()
+  const unlocked = canAccessMultiTargetReport(tier)
+
+  const body = (
+    <Card
+      className={
+        unlocked
+          ? 'border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors'
+          : 'border-border bg-surface-2/50'
+      }
+    >
+      <div className="flex items-start gap-3">
+        <Lock
+          size={16}
+          className={`${unlocked ? 'text-warn' : 'text-muted'} mt-0.5 shrink-0`}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-sm font-semibold">다면 관계 리포트</span>
+            {!unlocked && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent font-semibold">
+                Deep
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-muted mt-0.5 leading-relaxed">
+            {unlocked
+              ? '지금까지의 전 기록 통합 인사이트 · 패턴 · 장기 경고.'
+              : '모든 Target 을 가로질러 반복되는 패턴·경고·LTV 예측. Deep 플랜에서 열림.'}
+          </div>
+        </div>
+        <span
+          className={`text-xs shrink-0 ${
+            unlocked ? 'text-warn' : 'text-muted'
+          }`}
+        >
+          {unlocked ? '받기 →' : '잠김'}
+        </span>
+      </div>
+    </Card>
+  )
+
+  return (
+    <section>
+      {unlocked ? (
+        <Link href={`/r/${relationshipId}/report`}>{body}</Link>
+      ) : (
+        body
+      )}
+    </section>
+  )
+}
+

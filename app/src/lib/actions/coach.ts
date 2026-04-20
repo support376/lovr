@@ -32,6 +32,21 @@ export async function markActionExecutedAction(actionId: string) {
   revalidatePath('/')
 }
 
+export async function markActionCancelledAction(actionId: string) {
+  await engine.markActionCancelled(actionId)
+  revalidatePath('/')
+}
+
+export async function recordManualOutcomeAction(input: {
+  actionId: string
+  narrative: string
+  goalProgress: 'advanced' | 'stagnant' | 'regressed' | 'unclear'
+}) {
+  const res = await engine.recordManualOutcome(input)
+  revalidatePath('/')
+  return res
+}
+
 export async function generateWeeklyReportAction(relationshipId: string) {
   return engine.generateWeeklyReport(relationshipId)
 }
