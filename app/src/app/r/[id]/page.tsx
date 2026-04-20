@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { Lock } from 'lucide-react'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
@@ -47,12 +47,7 @@ export default async function RelationshipPage({
   const latestActions = await db
     .select()
     .from(actionsTbl)
-    .where(
-      and(
-        eq(actionsTbl.relationshipId, id),
-        inArray(actionsTbl.status, ['proposed', 'accepted'])
-      )
-    )
+    .where(eq(actionsTbl.relationshipId, id))
     .orderBy(desc(actionsTbl.createdAt))
     .limit(1)
   const latestAction = latestActions[0] ?? null
