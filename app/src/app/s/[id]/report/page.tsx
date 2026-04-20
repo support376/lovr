@@ -32,7 +32,7 @@ export default async function ReportPage({
     <>
       <header className="px-5 pt-6 pb-3 flex items-center gap-3">
         <Link
-          href={`/r/${id}`}
+          href={`/s/${id}`}
           className="w-9 h-9 rounded-full bg-surface-2 flex items-center justify-center"
         >
           <ChevronLeft size={20} />

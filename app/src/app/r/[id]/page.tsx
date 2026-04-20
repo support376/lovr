@@ -1,90 +1,73 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Lock } from 'lucide-react'
-import { desc, eq, inArray, and } from 'drizzle-orm'
+import { Zap, RefreshCw } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
-import { db } from '@/lib/db/client'
-import { actions as actionsTbl, insights, outcomes } from '@/lib/db/schema'
-import { requireUserId } from '@/lib/supabase/server'
 import { Card } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
-import { DetailsToggle } from './DetailsToggle'
-import { StrategyCards } from './StrategyCards'
-import { QuickActionCTA } from './QuickActionCTA'
+import { DeriveStateButton } from './DeriveStateButton'
+import type { InferredTrait } from '@/lib/db/schema'
 
-export default async function RelationshipPage({
+/**
+ * 관계 탭 상세 — 프로필 + AI 추출 분석 전용. 전략은 /s/[id] 로 분리.
+ */
+
+const PROGRESS_KO: Record<string, string> = {
+  unknown: '판단 불가',
+  observing: '관찰 중',
+  approaching: '다가가는 중',
+  exploring: '서로 탐색',
+  exclusive: '독점 직전',
+  committed: '공식 연인',
+  decayed: '식어감',
+  ended: '종료',
+  pre_match: '매칭 전',
+  first_contact: '첫 접촉',
+  sseom: '썸',
+  dating_early: '연애 초기',
+  dating_stable: '연애 안정',
+  conflict: '갈등',
+  reconnection: '재연결',
+}
+
+export default async function RelationshipProfilePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ edit?: string }>
 }) {
   const self = await getSelf()
   if (!self) redirect('/onboarding')
 
   const { id } = await params
-  const sp = await searchParams
-  const editOpen = sp.edit === '1'
-
   const rel = await getRelationship(id)
   if (!rel) notFound()
 
-  const uid = await requireUserId()
+  const partnerTraits: InferredTrait[] = rel.partner.inferredTraits ?? []
+  const selfTraits: InferredTrait[] = self.inferredTraits ?? []
 
-  const latestActions = await db
-    .select()
-    .from(actionsTbl)
-    .where(
-      and(
-        eq(actionsTbl.userId, uid),
-        eq(actionsTbl.relationshipId, id),
-        inArray(actionsTbl.status, ['proposed', 'accepted'])
-      )
-    )
-    .orderBy(desc(actionsTbl.createdAt))
-    .limit(1)
-  const latestAction = latestActions[0] ?? null
-
-  const outs = latestAction
-    ? await db
-        .select()
-        .from(outcomes)
-        .where(and(eq(outcomes.userId, uid), eq(outcomes.actionId, latestAction.id)))
-    : []
-  const hasOutcome = outs.length > 0
-
-  const activeInsights = await db
-    .select()
-    .from(insights)
-    .where(and(eq(insights.userId, uid), eq(insights.status, 'active')))
-    .orderBy(desc(insights.createdAt))
-    .limit(8)
-  const relevantInsights = activeInsights.filter(
-    (i) => !i.relationshipId || i.relationshipId === id
-  )
+  const dynamicsItems = [
+    { k: '힘의 균형', v: rel.powerBalance },
+    { k: '연락 패턴', v: rel.communicationPattern },
+    { k: '투자 비대칭', v: rel.investmentAsymmetry },
+    { k: '심화 속도', v: rel.escalationSpeed },
+  ].filter((d) => d.v)
 
   return (
     <>
-      {/* 헤더 — 이름(나이) + 상세 토글 우측 */}
       <header className="px-5 pt-4 pb-3 flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold truncate">
-              {rel.partner.displayName}
-              {rel.partner.age ? (
-                <span className="text-muted font-normal text-lg ml-1">
-                  ({rel.partner.age})
-                </span>
-              ) : null}
-            </h1>
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-            {rel.partner.mbti && (
-              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted font-mono">
-                {rel.partner.mbti}
+          <h1 className="text-2xl font-bold truncate">
+            {rel.partner.displayName}
+            {rel.partner.age ? (
+              <span className="text-muted font-normal text-lg ml-1">
+                ({rel.partner.age})
               </span>
-            )}
+            ) : null}
+          </h1>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+            <span className="px-2 py-0.5 rounded-full bg-accent/20 text-accent font-medium">
+              {PROGRESS_KO[rel.progress] ?? rel.progress}
+            </span>
             {rel.partner.occupation && (
               <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted">
                 {rel.partner.occupation}
@@ -97,67 +80,97 @@ export default async function RelationshipPage({
             )}
           </div>
         </div>
-
-        <DetailsToggle open={editOpen} relationshipId={id} />
+        <Link
+          href={`/s/${id}`}
+          className="shrink-0 inline-flex items-center gap-1 text-xs text-white font-medium px-3 py-2 rounded-lg bg-accent hover:brightness-110"
+        >
+          <Zap size={13} /> 전략
+        </Link>
       </header>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {editOpen && (
-          <PartnerInlineEditor rel={rel} showToggleButton={false} open={true} />
-        )}
+        {/* 재분석 버튼 — 최근 Event 기반 */}
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted">Event에서 자동 추출된 분석</div>
+          <DeriveStateButton relationshipId={id} />
+        </div>
 
-        {/* 1. 전략 — 해야할 행동 */}
-        <section className="flex flex-col gap-3">
-          <QuickActionCTA relationshipId={id} hasAction={!!latestAction} />
-
-          {latestAction && (
-            <StrategyCards
-              action={latestAction}
-              relationshipId={id}
-              hasOutcome={hasOutcome}
-            />
-          )}
-        </section>
-
-        {/* 2. 누적 Insight */}
-        {relevantInsights.length > 0 && (
+        {/* 관계 dynamics 4축 */}
+        {dynamicsItems.length > 0 && (
           <section>
-            <div className="text-xs text-muted mb-1.5 flex items-center justify-between">
-              <span>누적 Insight · 주간 리포트에서 뽑힘</span>
-              <Link href={`/r/${id}/report`} className="text-[11px] text-accent">
-                다시 생성 →
-              </Link>
+            <div className="text-xs text-muted uppercase tracking-wider mb-2">
+              관계 다이내믹
             </div>
-            <Card>
-              <ul className="flex flex-col gap-1.5">
-                {relevantInsights.slice(0, 5).map((i) => (
-                  <li key={i.id} className="text-xs leading-relaxed">
-                    <span className="text-muted">[{i.scope.replace('_', ' ')}]</span> {i.observation}
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            <div className="flex flex-col gap-2">
+              {dynamicsItems.map((d) => (
+                <div
+                  key={d.k}
+                  className="rounded-xl border border-border bg-surface-2 px-3 py-2.5"
+                >
+                  <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">
+                    {d.k}
+                  </div>
+                  <div className="text-sm leading-relaxed">{d.v}</div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
-        {/* 3. 다면 관계 리포트 */}
+        {/* 나 vs 상대 관찰 누적 */}
         <section>
-          <Link href={`/r/${id}/report`}>
-            <Card className="border-warn/30 bg-gradient-to-br from-warn/10 via-transparent to-accent-2/5 hover:border-warn/50 transition-colors">
-              <div className="flex items-start gap-3">
-                <Lock size={16} className="text-warn mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">다면 관계 리포트</div>
-                  <div className="text-[11px] text-muted mt-0.5 leading-relaxed">
-                    지금까지의 전 기록 통합 인사이트 · 패턴 · 장기 경고. (베타 무료)
-                  </div>
-                </div>
-                <span className="text-xs text-warn shrink-0">받기 →</span>
-              </div>
-            </Card>
-          </Link>
+          <div className="text-xs text-muted uppercase tracking-wider mb-2">
+            나 vs 상대 · Event에서 추출
+          </div>
+          <div className="grid grid-cols-1 gap-3">
+            <TraitsCard title="나" tone="accent-2" traits={selfTraits} />
+            <TraitsCard title={rel.partner.displayName} tone="accent" traits={partnerTraits} />
+          </div>
+        </section>
+
+        {/* 상대 프로필 편집 */}
+        <section>
+          <div className="text-xs text-muted uppercase tracking-wider mb-2">
+            {rel.partner.displayName} 프로필 (직접 입력)
+          </div>
+          <PartnerInlineEditor rel={rel} open={true} showToggleButton={false} />
         </section>
       </div>
     </>
+  )
+}
+
+function TraitsCard({
+  title,
+  tone,
+  traits,
+}: {
+  title: string
+  tone: 'accent' | 'accent-2'
+  traits: InferredTrait[]
+}) {
+  const borderClass = tone === 'accent' ? 'border-accent/30' : 'border-accent-2/30'
+  const bgClass =
+    tone === 'accent' ? 'bg-accent/5' : 'bg-accent-2/5'
+  const headerClass = tone === 'accent' ? 'text-accent' : 'text-accent-2'
+
+  return (
+    <Card className={`${borderClass} ${bgClass}`}>
+      <div className={`text-xs font-semibold mb-2 ${headerClass}`}>{title}</div>
+      {traits.length === 0 ? (
+        <div className="text-[11px] text-muted leading-relaxed inline-flex items-center gap-1.5">
+          <RefreshCw size={11} /> 아직 관찰 없음. 기록 탭에 대화·사건 쌓고 위 &ldquo;재분석&rdquo; 눌러.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {traits.map((t, i) => (
+            <li key={i} className="text-xs leading-relaxed">
+              • {t.observation}
+              <span className="text-muted ml-1">({t.confidenceNarrative})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

@@ -18,7 +18,7 @@ export function StrategyCards({ action, relationshipId, hasOutcome }: Props) {
 
   if (strategies.length === 0) {
     return (
-      <Link href={`/r/${relationshipId}/action/${action.id}`}>
+      <Link href={`/s/${relationshipId}/action/${action.id}`}>
         <Card className="hover:border-accent/60 transition-colors">
           <div className="flex items-center gap-2 mb-1.5">
             <Pill tone={action.status === 'accepted' ? 'good' : 'accent'}>
@@ -47,7 +47,7 @@ export function StrategyCards({ action, relationshipId, hasOutcome }: Props) {
             {strategies.length}개 행동
           </span>
           <Link
-            href={`/r/${relationshipId}/action/${action.id}`}
+            href={`/s/${relationshipId}/action/${action.id}`}
             className="ml-auto text-accent"
           >
             전체 보기 →
