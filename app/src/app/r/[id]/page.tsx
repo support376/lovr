@@ -9,11 +9,10 @@ import { actions as actionsTbl, goals, outcomes } from '@/lib/db/schema'
 import { ensureSchema } from '@/lib/db/init'
 import { Card, Pill } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
-import { StylePicker } from './StylePicker'
 import { DetailsToggle } from './DetailsToggle'
 import { StrategyCards } from './StrategyCards'
 import { QuickActionCTA } from './QuickActionCTA'
-import { STAGES, STYLES, GOALS } from '@/lib/ontology'
+import { STAGES, GOALS } from '@/lib/ontology'
 
 export default async function RelationshipPage({
   params,
@@ -63,17 +62,13 @@ export default async function RelationshipPage({
     rel.progress && STAGES[rel.progress as keyof typeof STAGES]
       ? STAGES[rel.progress as keyof typeof STAGES].ko
       : null
-  const styleLabel =
-    rel.style && STYLES[rel.style as keyof typeof STYLES]
-      ? STYLES[rel.style as keyof typeof STYLES].ko
-      : null
   const goalLabel = primaryGoal
     ? GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ?? primaryGoal.category
     : null
 
   return (
     <>
-      {/* 헤더 — 이름(나이) + 상세 토글 우측 */}
+      {/* 헤더 — 이름(나이) + 상세 토글 */}
       <header className="px-5 pt-4 pb-3 flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -109,7 +104,37 @@ export default async function RelationshipPage({
           <PartnerInlineEditor rel={rel} showToggleButton={false} open={true} />
         )}
 
-        {/* 1. 행동 — 최상단 메인 */}
+        {/* 1. 현재 상태 + 목표 — 단 두 줄 요약 */}
+        <section className="rounded-2xl border border-border bg-surface/50 divide-y divide-border">
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-xs text-muted shrink-0">현재 상태</span>
+            <div className="flex items-center gap-2 min-w-0">
+              {stageLabel ? (
+                <span className="text-sm">{stageLabel}</span>
+              ) : (
+                <span className="text-xs text-muted">미설정</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-4 py-3">
+            <span className="text-xs text-muted shrink-0">🎯 목표</span>
+            <div className="flex items-center gap-2 min-w-0">
+              {goalLabel ? (
+                <span className="text-sm truncate">{goalLabel}</span>
+              ) : (
+                <span className="text-xs text-muted">아직 없음</span>
+              )}
+              <Link
+                href={`/r/${id}/goals`}
+                className="shrink-0 text-[11px] text-accent"
+              >
+                변경
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* 2. 행동 */}
         <section className="flex flex-col gap-3">
           <QuickActionCTA
             relationshipId={id}
@@ -127,67 +152,6 @@ export default async function RelationshipPage({
             />
           )}
         </section>
-
-        {/* 2. 컨텍스트 요약 + 접힘 설정 */}
-        <details className="group rounded-2xl border border-border bg-surface/50 [&_summary::-webkit-details-marker]:hidden">
-          <summary className="cursor-pointer list-none px-4 py-3 flex items-center gap-2 text-xs">
-            <span className="text-muted">맥락</span>
-            <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
-              {goalLabel ? (
-                <Pill tone="accent">{goalLabel}</Pill>
-              ) : (
-                <span className="text-muted">목표 미설정</span>
-              )}
-              {styleLabel ? (
-                <Pill tone="accent">{styleLabel}</Pill>
-              ) : (
-                <span className="text-muted">· 스타일 자동</span>
-              )}
-            </div>
-            <span className="text-[11px] text-muted group-open:rotate-180 transition-transform">
-              ▾
-            </span>
-          </summary>
-
-          <div className="px-4 pb-4 flex flex-col gap-3">
-            {rel.description && (
-              <div className="text-xs text-muted whitespace-pre-wrap leading-relaxed">
-                {rel.description}
-              </div>
-            )}
-
-            {/* 목표 미니 */}
-            <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2 px-3 py-2.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs text-muted shrink-0">🎯 목표</span>
-                {primaryGoal ? (
-                  <span className="text-sm truncate">
-                    {GOALS[primaryGoal.category as keyof typeof GOALS]?.ko ??
-                      primaryGoal.category}
-                    {primaryGoal.description &&
-                    primaryGoal.description !==
-                      GOALS[primaryGoal.category as keyof typeof GOALS]?.ko
-                      ? ` · ${primaryGoal.description}`
-                      : ''}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted">
-                    아직 목표 설정 안 됨
-                  </span>
-                )}
-              </div>
-              <Link
-                href={`/r/${id}/goals`}
-                className="shrink-0 ml-2 text-[11px] text-accent"
-              >
-                변경
-              </Link>
-            </div>
-
-            {/* 스타일 */}
-            <StylePicker relationshipId={id} current={rel.style ?? null} />
-          </div>
-        </details>
 
         {/* 3. 다면 관계 리포트 */}
         <section>

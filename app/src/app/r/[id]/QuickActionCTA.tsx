@@ -1,16 +1,10 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Sparkles, RefreshCw } from 'lucide-react'
-import { createGoalAction, proposeStrategyAction } from '@/lib/actions/coach'
-import {
-  GOALS,
-  ALLOWED_GOALS_BY_STAGE,
-  normalizeStage,
-  type GoalKey,
-} from '@/lib/ontology'
-import type { Goal } from '@/lib/db/schema'
+import { proposeStrategyAction } from '@/lib/actions/coach'
 
 type Props = {
   relationshipId: string
@@ -21,48 +15,26 @@ type Props = {
 }
 
 /**
- * 관계 화면 최상단 — 한 탭으로 "지금 행동 받기".
- * - 목표 없으면 현재 stage 에 허용된 goal 중 하나 고르면서 저장+제안 원클릭
- * - 목표 있으면 바로 제안/업데이트
+ * 관계 화면 행동 버튼 — 단일 역할.
+ * 목표 없으면 /goals 로 유도, 있으면 전략 제안/업데이트.
  */
 export function QuickActionCTA({
   relationshipId,
-  partnerId,
   primaryGoalId,
   hasAction,
-  stage,
 }: Props) {
-  const options = useMemo<GoalKey[]>(
-    () => ALLOWED_GOALS_BY_STAGE[normalizeStage(stage)],
-    [stage]
-  )
-  const [category, setCategory] = useState<GoalKey>(options[0])
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
   const run = () => {
+    if (!primaryGoalId) return
     setErr(null)
     start(async () => {
       try {
-        let goalId = primaryGoalId
-        if (!goalId) {
-          const r = await createGoalAction({
-            relationshipId,
-            partnerId,
-            category: category as Goal['category'],
-            description: GOALS[category].ko,
-            priority: 'primary',
-          })
-          if (r.ethicsStatus === 'blocked') {
-            setErr(r.reasons[0] ?? '목표 생성 불가')
-            return
-          }
-          goalId = r.goalId
-        }
         await proposeStrategyAction({
           relationshipId,
-          goalId,
+          goalId: primaryGoalId,
           currentSituation: '(최근 Event 및 관계 맥락 기반)',
         })
         router.refresh()
@@ -72,6 +44,18 @@ export function QuickActionCTA({
     })
   }
 
+  if (!primaryGoalId) {
+    return (
+      <Link
+        href={`/r/${relationshipId}/goals`}
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl border border-accent/40 bg-accent/5 text-accent font-semibold text-sm hover:bg-accent/10 transition"
+      >
+        <Sparkles size={16} />
+        먼저 목표 설정
+      </Link>
+    )
+  }
+
   const buttonLabel = pending
     ? '생각 중 (20~40초)…'
     : hasAction
@@ -79,30 +63,7 @@ export function QuickActionCTA({
     : '지금 행동 받기'
 
   return (
-    <div className="rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface to-surface p-4 flex flex-col gap-3">
-      {!primaryGoalId && (
-        <>
-          <div className="text-xs text-muted">어떤 목적?</div>
-          <div className="flex flex-wrap gap-1.5">
-            {options.map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setCategory(k)}
-                disabled={pending}
-                className={`text-[11px] px-2.5 py-1.5 rounded-full border transition-colors ${
-                  category === k
-                    ? 'bg-accent/20 border-accent/50 text-accent'
-                    : 'bg-surface-2 border-border text-muted hover:border-accent/40'
-                }`}
-              >
-                {GOALS[k].ko}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
+    <div className="flex flex-col gap-2">
       <button
         onClick={run}
         disabled={pending}
