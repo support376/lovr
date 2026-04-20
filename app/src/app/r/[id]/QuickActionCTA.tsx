@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { proposeStrategyAction } from '@/lib/actions/coach'
@@ -52,13 +51,10 @@ export function QuickActionCTA({
 
   if (!primaryGoalId) {
     return (
-      <Link
-        href={`/r/${relationshipId}/goals`}
-        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl border border-accent/40 bg-accent/5 text-accent font-semibold text-sm hover:bg-accent/10 transition"
-      >
-        <Sparkles size={16} />
-        먼저 목표 설정
-      </Link>
+      <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl border border-border bg-surface-2 text-muted font-semibold text-sm">
+        <Sparkles size={16} className="opacity-60" />
+        위 배지에서 목표 먼저 선택
+      </div>
     )
   }
 

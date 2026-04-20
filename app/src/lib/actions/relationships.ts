@@ -1,16 +1,22 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import {
   actors,
+  goals,
   relationships,
   type Actor,
   type Relationship,
 } from '../db/schema'
 import { ensureSchema } from '../db/init'
+import {
+  ALLOWED_GOALS_BY_STAGE,
+  normalizeStage,
+  type GoalKey,
+} from '../ontology'
 
 export async function listRelationships(): Promise<Array<Relationship & { partner: Actor }>> {
   await ensureSchema()
@@ -103,8 +109,11 @@ export async function updateRelationship(
   try {
     await ensureSchema()
 
-    // stage 전이 감지 — progress 가 실제로 바뀌면 stageHistory 에 append
+    // stage 전이 감지 — progress 가 실제로 바뀌면:
+    //   1) stageHistory 에 append
+    //   2) 새 stage 에서 허용 안 되는 기존 active goals 자동 deprecate
     let stageHistoryUpdate: Array<{ stage: string; at: number }> | undefined
+    let stageChanged = false
     if (patch.progress !== undefined) {
       const [prev] = await db
         .select()
@@ -112,6 +121,7 @@ export async function updateRelationship(
         .where(eq(relationships.id, id))
         .limit(1)
       if (prev && prev.progress !== patch.progress) {
+        stageChanged = true
         const hist = Array.isArray(prev.stageHistory) ? prev.stageHistory : []
         stageHistoryUpdate = [...hist, { stage: patch.progress, at: Date.now() }]
       }
@@ -129,6 +139,27 @@ export async function updateRelationship(
       .update(relationships)
       .set(updates)
       .where(eq(relationships.id, id))
+
+    // stage 변경되면 새 stage 의 ALLOWED_GOALS_BY_STAGE 에 없는 active goal 은
+    // deprecate (유저가 새 목표 재설정 하도록 유도).
+    if (stageChanged && patch.progress) {
+      const stageKey = normalizeStage(patch.progress)
+      const allowed: readonly GoalKey[] = ALLOWED_GOALS_BY_STAGE[stageKey]
+      const active = await db
+        .select()
+        .from(goals)
+        .where(and(eq(goals.relationshipId, id), isNull(goals.deprecatedAt)))
+      const now = new Date()
+      for (const g of active) {
+        if (!(allowed as readonly string[]).includes(g.category)) {
+          await db
+            .update(goals)
+            .set({ deprecatedAt: now })
+            .where(eq(goals.id, g.id))
+        }
+      }
+    }
+
     revalidatePath('/')
     revalidatePath(`/r/${id}`)
   } catch (e) {
