@@ -1,11 +1,11 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import { conversations, type Conversation } from '../db/schema'
-import { ensureSchema } from '../db/init'
+import { requireUserId } from '../supabase/server'
 
 export type ConversationMessage = {
   role: 'user' | 'assistant'
@@ -17,12 +17,13 @@ export async function createConversation(input?: {
   relationshipId?: string | null
   title?: string
 }): Promise<Conversation> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const id = `conv-${randomUUID()}`
   const [row] = await db
     .insert(conversations)
     .values({
       id,
+      userId: uid,
       relationshipId: input?.relationshipId ?? null,
       title: input?.title ?? '새 대화',
       messages: [],
@@ -37,11 +38,11 @@ export async function appendConversationMessage(input: {
   role: 'user' | 'assistant'
   content: string
 }): Promise<void> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const [row] = await db
     .select()
     .from(conversations)
-    .where(eq(conversations.id, input.id))
+    .where(and(eq(conversations.id, input.id), eq(conversations.userId, uid)))
     .limit(1)
   if (!row) throw new Error('Conversation not found')
 
@@ -50,7 +51,6 @@ export async function appendConversationMessage(input: {
     { role: input.role, content: input.content, at: Date.now() },
   ]
 
-  // 첫 user 메시지면 title 자동 업데이트
   let title = row.title
   if (
     (row.messages ?? []).length === 0 &&
@@ -63,7 +63,7 @@ export async function appendConversationMessage(input: {
   await db
     .update(conversations)
     .set({ messages: next, title, updatedAt: new Date() })
-    .where(eq(conversations.id, input.id))
+    .where(and(eq(conversations.id, input.id), eq(conversations.userId, uid)))
   revalidatePath('/')
 }
 
@@ -75,10 +75,11 @@ export async function listConversations(limit = 20): Promise<
     messageCount: number
   }>
 > {
-  await ensureSchema()
+  const uid = await requireUserId()
   const rows = await db
     .select()
     .from(conversations)
+    .where(eq(conversations.userId, uid))
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
   return rows.map((r) => ({
@@ -91,28 +92,31 @@ export async function listConversations(limit = 20): Promise<
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const [row] = await db
     .select()
     .from(conversations)
-    .where(eq(conversations.id, id))
+    .where(and(eq(conversations.id, id), eq(conversations.userId, uid)))
     .limit(1)
   return row ?? null
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  await ensureSchema()
-  await db.delete(conversations).where(eq(conversations.id, id))
+  const uid = await requireUserId()
+  await db
+    .delete(conversations)
+    .where(and(eq(conversations.id, id), eq(conversations.userId, uid)))
   revalidatePath('/')
 }
 
 export async function getOrCreateLatestConversation(
   relationshipId?: string | null
 ): Promise<Conversation> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const recent = await db
     .select()
     .from(conversations)
+    .where(eq(conversations.userId, uid))
     .orderBy(desc(conversations.updatedAt))
     .limit(1)
   if (recent[0]) return recent[0]

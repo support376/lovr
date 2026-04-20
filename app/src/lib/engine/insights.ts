@@ -1,8 +1,8 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { insights } from '../db/schema'
-import { ensureSchema } from '../db/init'
 
 /**
  * 주간 리포트 markdown 의 "## Insight 갱신" 섹션을 파싱해서
@@ -66,16 +66,16 @@ export function parseInsightsSection(markdown: string): ParseResult {
 }
 
 export async function saveInsightsFromReport(params: {
+  userId: string
   relationshipId: string
   reportMarkdown: string
 }): Promise<{ count: number; invalidated: number; superseded: number }> {
-  await ensureSchema()
   const parsed = parseInsightsSection(params.reportMarkdown)
 
-  // 신규 삽입
   for (const it of parsed.newItems) {
     await db.insert(insights).values({
       id: `ins-${randomUUID()}`,
+      userId: params.userId,
       scope: it.scope,
       relationshipId:
         it.scope === 'relationship_specific' || it.scope === 'partner_pattern'
@@ -88,13 +88,17 @@ export async function saveInsightsFromReport(params: {
     })
   }
 
-  // 상태 업데이트 (invalidate / supersede)
-  const { eq } = await import('drizzle-orm')
   for (const id of parsed.invalidate) {
-    await db.update(insights).set({ status: 'invalidated' }).where(eq(insights.id, id))
+    await db
+      .update(insights)
+      .set({ status: 'invalidated' })
+      .where(and(eq(insights.id, id), eq(insights.userId, params.userId)))
   }
   for (const id of parsed.supersede) {
-    await db.update(insights).set({ status: 'superseded' }).where(eq(insights.id, id))
+    await db
+      .update(insights)
+      .set({ status: 'superseded' })
+      .where(and(eq(insights.id, id), eq(insights.userId, params.userId)))
   }
 
   return {

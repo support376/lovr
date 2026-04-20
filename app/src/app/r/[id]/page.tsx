@@ -6,7 +6,7 @@ import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
 import { actions as actionsTbl, insights, outcomes } from '@/lib/db/schema'
-import { ensureSchema } from '@/lib/db/init'
+import { requireUserId } from '@/lib/supabase/server'
 import { Card } from '@/components/ui'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DetailsToggle } from './DetailsToggle'
@@ -30,13 +30,14 @@ export default async function RelationshipPage({
   const rel = await getRelationship(id)
   if (!rel) notFound()
 
-  await ensureSchema()
+  const uid = await requireUserId()
 
   const latestActions = await db
     .select()
     .from(actionsTbl)
     .where(
       and(
+        eq(actionsTbl.userId, uid),
         eq(actionsTbl.relationshipId, id),
         inArray(actionsTbl.status, ['proposed', 'accepted'])
       )
@@ -46,15 +47,17 @@ export default async function RelationshipPage({
   const latestAction = latestActions[0] ?? null
 
   const outs = latestAction
-    ? await db.select().from(outcomes).where(eq(outcomes.actionId, latestAction.id))
+    ? await db
+        .select()
+        .from(outcomes)
+        .where(and(eq(outcomes.userId, uid), eq(outcomes.actionId, latestAction.id)))
     : []
   const hasOutcome = outs.length > 0
 
-  // active Insight — 이 관계 특정 + self/partner 공통 패턴
   const activeInsights = await db
     .select()
     .from(insights)
-    .where(eq(insights.status, 'active'))
+    .where(and(eq(insights.userId, uid), eq(insights.status, 'active')))
     .orderBy(desc(insights.createdAt))
     .limit(8)
   const relevantInsights = activeInsights.filter(

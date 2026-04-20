@@ -5,6 +5,7 @@ import { anthropic, FAST_MODEL } from '../ai/client'
 import { buildContext } from '../engine/context'
 import { realtimeCorePrompt } from '../prompts/loader'
 import { getCurrentRelationship } from './relationships'
+import { requireUserId } from '../supabase/server'
 
 export type LuvAIMessage = {
   role: 'user' | 'assistant'
@@ -15,9 +16,10 @@ export async function askLuvAI(history: LuvAIMessage[]): Promise<{
   reply: string
   partnerName: string | null
 }> {
+  const uid = await requireUserId()
   const cur = await getCurrentRelationship()
   const ctxMd = cur
-    ? (await buildContext(cur.id, 15)).markdown
+    ? (await buildContext(uid, cur.id, 15)).markdown
     : '(현재 활성 관계 없음. 관계·상대 아직 등록 안 함.)'
 
   const system = `${realtimeCorePrompt()}

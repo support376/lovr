@@ -10,7 +10,6 @@ import {
   type Action,
   type Outcome,
 } from '../db/schema'
-import { ensureSchema } from '../db/init'
 import { anthropic, MODEL } from '../ai/client'
 import {
   outcomeAnalysisPrompt,
@@ -19,20 +18,12 @@ import {
 } from '../prompts/loader'
 import { buildContext } from './context'
 
-/**
- * 6노드 온톨로지 기반 전략 제안.
- * 입력: User · Target · Events(Fact/Why) · Relationship State · 최근 Outcomes · active Insights.
- * Goal·Style·Plays 카탈로그·윤리 엔진 모두 제거됨. 자연어 자유 추출.
- *
- * DB 레거시: actions.goalId NOT NULL 제약 때문에 관계당 1개 "auto" goal을 조용히 유지하고 FK 채움.
- */
 export async function proposeStrategy(params: {
+  userId: string
   relationshipId: string
   currentSituation?: string
 }): Promise<{ actionId: string; markdown: string }> {
-  await ensureSchema()
-
-  const ctx = await buildContext(params.relationshipId, 30)
+  const ctx = await buildContext(params.userId, params.relationshipId, 30)
 
   const client = anthropic()
   const system = strategyProposalPrompt()
@@ -56,11 +47,12 @@ ${params.currentSituation?.trim() || '(없음 · 최근 Event 기반으로만 �
     .join('\n')
     .trim()
 
-  const autoGoalId = await ensureAutoGoal(params.relationshipId)
+  const autoGoalId = await ensureAutoGoal(params.userId, params.relationshipId)
 
   const id = `act-${randomUUID()}`
   await db.insert(actionsTbl).values({
     id,
+    userId: params.userId,
     relationshipId: params.relationshipId,
     goalId: autoGoalId,
     source: 'ai_proposed',
@@ -73,16 +65,14 @@ ${params.currentSituation?.trim() || '(없음 · 최근 Event 기반으로만 �
   return { actionId: id, markdown }
 }
 
-/**
- * 관계당 1개 유지되는 placeholder goal id. 레거시 FK 만족용, UI 노출 X.
- */
-async function ensureAutoGoal(relationshipId: string): Promise<string> {
+async function ensureAutoGoal(userId: string, relationshipId: string): Promise<string> {
   const existing = await db
     .select()
     .from(goals)
     .where(
       and(
         eq(goals.relationshipId, relationshipId),
+        eq(goals.userId, userId),
         eq(goals.category, 'auto'),
         isNull(goals.deprecatedAt)
       )
@@ -93,6 +83,7 @@ async function ensureAutoGoal(relationshipId: string): Promise<string> {
   const id = `goal-${randomUUID()}`
   await db.insert(goals).values({
     id,
+    userId,
     relationshipId,
     category: 'auto',
     description: '(legacy placeholder — ontology 제거 후 자동 생성)',
@@ -104,23 +95,19 @@ async function ensureAutoGoal(relationshipId: string): Promise<string> {
   return id
 }
 
-/**
- * 실행 후 결과 분석. Outcome 기록.
- * 유저가 직접 메모를 남긴 경우 userNote를 함께 주입.
- */
 export async function analyzeOutcome(
+  userId: string,
   actionId: string,
   userNote?: string
 ): Promise<{ outcomeId: string; markdown: string }> {
-  await ensureSchema()
   const [action] = await db
     .select()
     .from(actionsTbl)
-    .where(eq(actionsTbl.id, actionId))
+    .where(and(eq(actionsTbl.id, actionId), eq(actionsTbl.userId, userId)))
     .limit(1)
   if (!action) throw new Error('Action not found')
 
-  const ctx = await buildContext(action.relationshipId, 50)
+  const ctx = await buildContext(userId, action.relationshipId, 50)
 
   const executedAt =
     action.executedAt instanceof Date
@@ -182,6 +169,7 @@ ${ctx.markdown}`
   const id = `out-${randomUUID()}`
   await db.insert(outcomes).values({
     id,
+    userId,
     actionId,
     observedSignals: eventsBlock,
     relatedEventIds: afterEvents.map((e) => e.id),
@@ -195,29 +183,24 @@ ${ctx.markdown}`
   return { outcomeId: id, markdown: combined }
 }
 
-export async function markActionExecuted(actionId: string): Promise<void> {
-  await ensureSchema()
+export async function markActionExecuted(userId: string, actionId: string): Promise<void> {
   await db
     .update(actionsTbl)
     .set({ status: 'executed', executedAt: new Date() })
-    .where(eq(actionsTbl.id, actionId))
+    .where(and(eq(actionsTbl.id, actionId), eq(actionsTbl.userId, userId)))
 }
 
-/**
- * 주간 리포트 — 지난 7일 Event/Action/Outcome을 받아 Insight 초안 생성.
- */
-export async function generateWeeklyReport(relationshipId: string): Promise<{
-  markdown: string
-}> {
-  await ensureSchema()
-
+export async function generateWeeklyReport(
+  userId: string,
+  relationshipId: string
+): Promise<{ markdown: string }> {
   const now = Date.now()
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
 
   const allEvents = await db
     .select()
     .from(events)
-    .where(eq(events.relationshipId, relationshipId))
+    .where(and(eq(events.relationshipId, relationshipId), eq(events.userId, userId)))
     .orderBy(desc(events.timestamp))
   const recent = allEvents.filter((e) => {
     const t = e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp)
@@ -227,7 +210,9 @@ export async function generateWeeklyReport(relationshipId: string): Promise<{
   const allActions = await db
     .select()
     .from(actionsTbl)
-    .where(eq(actionsTbl.relationshipId, relationshipId))
+    .where(
+      and(eq(actionsTbl.relationshipId, relationshipId), eq(actionsTbl.userId, userId))
+    )
   const recentActions = allActions.filter((a) => {
     const t = a.createdAt instanceof Date ? a.createdAt.getTime() : Number(a.createdAt)
     return t >= sevenDaysAgo
@@ -236,11 +221,14 @@ export async function generateWeeklyReport(relationshipId: string): Promise<{
   const actionIds = recentActions.map((a) => a.id)
   const recentOutcomes: Outcome[] = []
   for (const id of actionIds) {
-    const rows = await db.select().from(outcomes).where(eq(outcomes.actionId, id))
+    const rows = await db
+      .select()
+      .from(outcomes)
+      .where(and(eq(outcomes.actionId, id), eq(outcomes.userId, userId)))
     recentOutcomes.push(...rows)
   }
 
-  const ctx = await buildContext(relationshipId, 0)
+  const ctx = await buildContext(userId, relationshipId, 0)
   const partnerName = ctx.partner?.displayName ?? '?'
 
   const system = weeklyReportPrompt()

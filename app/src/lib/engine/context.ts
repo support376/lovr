@@ -15,8 +15,7 @@ import {
 } from '../db/schema'
 
 /**
- * LLM 컨텍스트 조립 공통 로직.
- * Event 원자료를 그대로 markdown으로 주입. 요약·추출 금지.
+ * LLM 컨텍스트 조립. user_id 기준 파티션.
  */
 export type RenderedContext = {
   markdown: string
@@ -28,44 +27,55 @@ export type RenderedContext = {
   insights: Insight[]
 }
 
-export async function buildContext(relationshipId: string, eventLimit = 15): Promise<RenderedContext> {
+export async function buildContext(
+  userId: string,
+  relationshipId: string,
+  eventLimit = 15
+): Promise<RenderedContext> {
   // self
   const [self] = await db
     .select()
     .from(actors)
-    .where(eq(actors.id, 'actor-self'))
+    .where(and(eq(actors.userId, userId), eq(actors.role, 'self')))
     .limit(1)
 
   // relationship
   const [rel] = await db
     .select()
     .from(relationships)
-    .where(eq(relationships.id, relationshipId))
+    .where(and(eq(relationships.id, relationshipId), eq(relationships.userId, userId)))
     .limit(1)
   const [partner] = rel
-    ? await db.select().from(actors).where(eq(actors.id, rel.partnerId)).limit(1)
+    ? await db
+        .select()
+        .from(actors)
+        .where(and(eq(actors.id, rel.partnerId), eq(actors.userId, userId)))
+        .limit(1)
     : [undefined]
 
-  // active goals
   const allGoals = await db
     .select()
     .from(goals)
-    .where(and(eq(goals.relationshipId, relationshipId), isNull(goals.deprecatedAt)))
+    .where(
+      and(
+        eq(goals.relationshipId, relationshipId),
+        eq(goals.userId, userId),
+        isNull(goals.deprecatedAt)
+      )
+    )
     .orderBy(desc(goals.createdAt))
 
-  // events
   const evList = await db
     .select()
     .from(events)
-    .where(eq(events.relationshipId, relationshipId))
+    .where(and(eq(events.relationshipId, relationshipId), eq(events.userId, userId)))
     .orderBy(desc(events.timestamp))
     .limit(eventLimit)
 
-  // active insights
   const ins = await db
     .select()
     .from(insights)
-    .where(eq(insights.status, 'active'))
+    .where(and(eq(insights.userId, userId), eq(insights.status, 'active')))
     .orderBy(desc(insights.createdAt))
 
   const md = renderMarkdown({
@@ -73,7 +83,7 @@ export async function buildContext(relationshipId: string, eventLimit = 15): Pro
     partner: partner ?? null,
     relationship: rel ?? null,
     goals: allGoals,
-    events: [...evList].reverse(), // 오래된 것 → 최신
+    events: [...evList].reverse(),
     insights: ins,
   })
 
@@ -142,17 +152,6 @@ function renderMarkdown(c: {
     }
   } else {
     lines.push('(관계 미연결)')
-  }
-
-  lines.push('')
-  lines.push('## [목표]')
-  if (c.goals.length === 0) {
-    lines.push('(설정된 목표 없음)')
-  } else {
-    for (const g of c.goals) {
-      const eth = g.ethicsStatus !== 'ok' ? ` [ethics=${g.ethicsStatus}]` : ''
-      lines.push(`- [${g.category}/${g.priority}]${eth} ${g.description}`)
-    }
   }
 
   lines.push('')

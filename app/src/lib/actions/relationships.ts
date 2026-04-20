@@ -1,7 +1,7 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import {
@@ -10,13 +10,14 @@ import {
   type Actor,
   type Relationship,
 } from '../db/schema'
-import { ensureSchema } from '../db/init'
+import { requireUserId } from '../supabase/server'
 
 export async function listRelationships(): Promise<Array<Relationship & { partner: Actor }>> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const rels = await db
     .select()
     .from(relationships)
+    .where(eq(relationships.userId, uid))
     .orderBy(desc(relationships.updatedAt))
 
   const result: Array<Relationship & { partner: Actor }> = []
@@ -24,7 +25,7 @@ export async function listRelationships(): Promise<Array<Relationship & { partne
     const [p] = await db
       .select()
       .from(actors)
-      .where(eq(actors.id, r.partnerId))
+      .where(and(eq(actors.id, r.partnerId), eq(actors.userId, uid)))
       .limit(1)
     if (p) result.push({ ...r, partner: p })
   }
@@ -34,14 +35,18 @@ export async function listRelationships(): Promise<Array<Relationship & { partne
 export async function getRelationship(
   id: string
 ): Promise<(Relationship & { partner: Actor }) | null> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const [r] = await db
     .select()
     .from(relationships)
-    .where(eq(relationships.id, id))
+    .where(and(eq(relationships.id, id), eq(relationships.userId, uid)))
     .limit(1)
   if (!r) return null
-  const [p] = await db.select().from(actors).where(eq(actors.id, r.partnerId)).limit(1)
+  const [p] = await db
+    .select()
+    .from(actors)
+    .where(and(eq(actors.id, r.partnerId), eq(actors.userId, uid)))
+    .limit(1)
   if (!p) return null
   return { ...r, partner: p }
 }
@@ -61,13 +66,14 @@ export async function createRelationship(input: {
   progress?: string
   exclusivity?: string
 }): Promise<{ relationshipId: string; partnerId: string }> {
-  await ensureSchema()
+  const uid = await requireUserId()
 
   const partnerId = `actor-${randomUUID()}`
   const relId = `rel-${randomUUID()}`
 
   await db.insert(actors).values({
     id: partnerId,
+    userId: uid,
     role: 'partner',
     displayName: input.partnerName,
     rawNotes: input.partnerRawNotes ?? null,
@@ -77,6 +83,7 @@ export async function createRelationship(input: {
 
   await db.insert(relationships).values({
     id: relId,
+    userId: uid,
     partnerId,
     progress: input.progress ?? 'observing',
     exclusivity: input.exclusivity ?? 'unknown',
@@ -97,11 +104,11 @@ export async function updateRelationship(
     'escalationSpeed' | 'status'
   >>
 ): Promise<void> {
-  await ensureSchema()
+  const uid = await requireUserId()
   await db
     .update(relationships)
     .set({ ...patch, updatedAt: new Date() })
-    .where(eq(relationships.id, id))
+    .where(and(eq(relationships.id, id), eq(relationships.userId, uid)))
   revalidatePath('/')
   revalidatePath(`/r/${id}`)
 }
@@ -118,7 +125,7 @@ export async function updatePartner(
     occupation?: string | null
   }
 ): Promise<void> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const updates: Record<string, unknown> = {}
   if (patch.displayName !== undefined) updates.displayName = patch.displayName
   if (patch.rawNotes !== undefined) updates.rawNotes = patch.rawNotes
@@ -127,6 +134,9 @@ export async function updatePartner(
   if (patch.age !== undefined) updates.age = patch.age
   if (patch.gender !== undefined) updates.gender = patch.gender
   if (patch.occupation !== undefined) updates.occupation = patch.occupation
-  await db.update(actors).set(updates).where(eq(actors.id, partnerId))
+  await db
+    .update(actors)
+    .set(updates)
+    .where(and(eq(actors.id, partnerId), eq(actors.userId, uid)))
   revalidatePath('/')
 }

@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
 import { insights } from '@/lib/db/schema'
-import { ensureSchema } from '@/lib/db/init'
+import { requireUserId } from '@/lib/supabase/server'
 import { Card, PageHeader, Pill } from '@/components/ui'
 import { ReportClient } from './ReportClient'
 
@@ -21,11 +21,11 @@ export default async function ReportPage({
   const rel = await getRelationship(id)
   if (!rel) notFound()
 
-  await ensureSchema()
+  const uid = await requireUserId()
   const activeInsights = await db
     .select()
     .from(insights)
-    .where(eq(insights.status, 'active'))
+    .where(and(eq(insights.userId, uid), eq(insights.status, 'active')))
     .orderBy(desc(insights.createdAt))
 
   return (

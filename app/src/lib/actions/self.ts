@@ -1,16 +1,22 @@
 'use server'
 
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import { actors, type Actor } from '../db/schema'
-import { ensureSchema } from '../db/init'
+import { requireUserId } from '../supabase/server'
 
-const SELF_ID = 'actor-self'
+function selfId(userId: string) {
+  return `self-${userId}`
+}
 
 export async function getSelf(): Promise<Actor | null> {
-  await ensureSchema()
-  const rows = await db.select().from(actors).where(eq(actors.id, SELF_ID)).limit(1)
+  const uid = await requireUserId()
+  const rows = await db
+    .select()
+    .from(actors)
+    .where(and(eq(actors.userId, uid), eq(actors.role, 'self')))
+    .limit(1)
   return rows[0] ?? null
 }
 
@@ -39,14 +45,15 @@ export type SelfInput = {
 }
 
 export async function createSelf(input: SelfInput & { displayName: string }): Promise<Actor> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const existing = await getSelf()
   if (existing) return updateSelf(input)
 
   const [created] = await db
     .insert(actors)
     .values({
-      id: SELF_ID,
+      id: selfId(uid),
+      userId: uid,
       role: 'self',
       displayName: input.displayName,
       rawNotes: input.rawNotes ?? null,
@@ -90,7 +97,7 @@ const ALLOWED_FIELDS = [
 ] as const
 
 export async function updateSelf(input: SelfInput): Promise<Actor> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const updates: Record<string, unknown> = {}
   for (const k of ALLOWED_FIELDS) {
     const v = (input as Record<string, unknown>)[k]
@@ -100,7 +107,7 @@ export async function updateSelf(input: SelfInput): Promise<Actor> {
   const [updated] = await db
     .update(actors)
     .set(updates)
-    .where(eq(actors.id, SELF_ID))
+    .where(and(eq(actors.userId, uid), eq(actors.role, 'self')))
     .returning()
 
   revalidatePath('/')

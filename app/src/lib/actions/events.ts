@@ -1,11 +1,11 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
-import { events, type Event } from '../db/schema'
-import { ensureSchema } from '../db/init'
+import { events, relationships, type Event } from '../db/schema'
+import { requireUserId } from '../supabase/server'
 
 export type EventType =
   | 'message'
@@ -18,10 +18,15 @@ export type EventType =
   | 'recovery'
   | 'external_info'
 
-/**
- * Event 추가 — append-only. 수정/삭제 금지 원칙.
- * content는 raw markdown 그대로 저장.
- */
+async function assertRelationshipOwned(relationshipId: string, uid: string) {
+  const [r] = await db
+    .select({ id: relationships.id })
+    .from(relationships)
+    .where(and(eq(relationships.id, relationshipId), eq(relationships.userId, uid)))
+    .limit(1)
+  if (!r) throw new Error('Relationship not found or not yours')
+}
+
 export async function addEvent(input: {
   relationshipId: string
   type: EventType
@@ -32,13 +37,15 @@ export async function addEvent(input: {
   selfNote?: string
   contextTags?: string[]
 }): Promise<{ eventId: string }> {
-  await ensureSchema()
+  const uid = await requireUserId()
+  await assertRelationshipOwned(input.relationshipId, uid)
 
   const id = `evt-${randomUUID()}`
   const ts = input.timestamp ?? Date.now()
 
   await db.insert(events).values({
     id,
+    userId: uid,
     relationshipId: input.relationshipId,
     timestamp: new Date(ts),
     type: input.type,
@@ -58,16 +65,15 @@ export async function listEvents(
   relationshipId: string,
   limit = 200
 ): Promise<Event[]> {
-  await ensureSchema()
+  const uid = await requireUserId()
   return db
     .select()
     .from(events)
-    .where(eq(events.relationshipId, relationshipId))
+    .where(and(eq(events.relationshipId, relationshipId), eq(events.userId, uid)))
     .orderBy(desc(events.timestamp))
     .limit(limit)
 }
 
-/** Event 수정 — 날짜·타입·내용·selfNote(Why) 변경 가능. */
 export async function updateEvent(input: {
   id: string
   type?: EventType
@@ -75,40 +81,50 @@ export async function updateEvent(input: {
   selfNote?: string | null
   timestamp?: number
 }): Promise<void> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const updates: Record<string, unknown> = {}
   if (input.type !== undefined) updates.type = input.type
   if (input.content !== undefined) updates.content = input.content
   if (input.selfNote !== undefined) updates.selfNote = input.selfNote
   if (input.timestamp !== undefined) updates.timestamp = new Date(input.timestamp)
 
-  const [row] = await db.select().from(events).where(eq(events.id, input.id)).limit(1)
+  const [row] = await db
+    .select()
+    .from(events)
+    .where(and(eq(events.id, input.id), eq(events.userId, uid)))
+    .limit(1)
   if (!row) throw new Error('Event not found')
 
-  await db.update(events).set(updates).where(eq(events.id, input.id))
+  await db
+    .update(events)
+    .set(updates)
+    .where(and(eq(events.id, input.id), eq(events.userId, uid)))
   revalidatePath('/timeline')
   revalidatePath(`/r/${row.relationshipId}`)
 }
 
 export async function deleteEvent(id: string): Promise<void> {
-  await ensureSchema()
-  const [row] = await db.select().from(events).where(eq(events.id, id)).limit(1)
+  const uid = await requireUserId()
+  const [row] = await db
+    .select()
+    .from(events)
+    .where(and(eq(events.id, id), eq(events.userId, uid)))
+    .limit(1)
   if (!row) return
-  await db.delete(events).where(eq(events.id, id))
+  await db.delete(events).where(and(eq(events.id, id), eq(events.userId, uid)))
   revalidatePath('/timeline')
   revalidatePath(`/r/${row.relationshipId}`)
 }
 
-/** 주간 리포트 등에서 최근 N일 범위. */
 export async function listRecentEvents(
   relationshipId: string,
   sinceDays: number
 ): Promise<Event[]> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const all = await db
     .select()
     .from(events)
-    .where(eq(events.relationshipId, relationshipId))
+    .where(and(eq(events.relationshipId, relationshipId), eq(events.userId, uid)))
     .orderBy(desc(events.timestamp))
   const cutoff = Date.now() - sinceDays * 24 * 60 * 60 * 1000
   return all.filter((e) => {

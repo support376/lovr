@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { db } from '@/lib/db/client'
 import { actions as actionsTbl, outcomes } from '@/lib/db/schema'
-import { ensureSchema } from '@/lib/db/init'
+import { requireUserId } from '@/lib/supabase/server'
 import { Card, PageHeader, Pill } from '@/components/ui'
 import { ActionControls } from './ActionControls'
 
@@ -21,14 +21,18 @@ export default async function ActionDetailPage({
   const rel = await getRelationship(id)
   if (!rel) notFound()
 
-  await ensureSchema()
-  const [action] = await db.select().from(actionsTbl).where(eq(actionsTbl.id, aid)).limit(1)
+  const uid = await requireUserId()
+  const [action] = await db
+    .select()
+    .from(actionsTbl)
+    .where(and(eq(actionsTbl.id, aid), eq(actionsTbl.userId, uid)))
+    .limit(1)
   if (!action) notFound()
 
   const out = await db
     .select()
     .from(outcomes)
-    .where(eq(outcomes.actionId, aid))
+    .where(and(eq(outcomes.actionId, aid), eq(outcomes.userId, uid)))
     .orderBy(desc(outcomes.createdAt))
 
   return (

@@ -10,6 +10,7 @@ import {
 } from '../prompts/loader'
 import { addEvent } from './events'
 import { getCurrentRelationship } from './relationships'
+import { requireUserId } from '../supabase/server'
 
 export async function askFast(input: {
   chunk: string
@@ -40,9 +41,10 @@ export async function askMid(input: {
   transcript: string
   relationshipId?: string
 }): Promise<{ markdown: string }> {
+  const uid = await requireUserId()
   let ctxMd = '(관계 맥락 미지정)'
   if (input.relationshipId) {
-    const ctx = await buildContext(input.relationshipId, 8)
+    const ctx = await buildContext(uid, input.relationshipId, 8)
     ctxMd = ctx.markdown
   }
   const client = anthropic()
@@ -80,9 +82,10 @@ export async function askTenMinReport(input: {
   mode?: string
   relationshipId?: string
 }): Promise<{ markdown: string }> {
+  const uid = await requireUserId()
   let ctxMd = '(관계 맥락 미지정)'
   if (input.relationshipId) {
-    const ctx = await buildContext(input.relationshipId, 5)
+    const ctx = await buildContext(uid, input.relationshipId, 5)
     ctxMd = ctx.markdown
   }
 

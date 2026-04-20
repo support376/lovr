@@ -1,8 +1,7 @@
 import 'server-only'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { actors, relationships, type InferredTrait } from '../db/schema'
-import { ensureSchema } from '../db/init'
 import { anthropic, MID_MODEL } from '../ai/client'
 import { buildContext } from './context'
 import { stateInferencePrompt } from '../prompts/loader'
@@ -38,13 +37,14 @@ const VALID_CONFLICT = new Set(['healthy', 'tension', 'conflict', 'recovery'])
  * Event 기반으로 관계 stage + dynamics 자동 추론 후 DB에 저장.
  * Sonnet 사용. 이벤트 부족하면 그대로 unknown 유지.
  */
-export async function deriveRelationshipState(relationshipId: string): Promise<{
+export async function deriveRelationshipState(
+  userId: string,
+  relationshipId: string
+): Promise<{
   derived: DerivedState
   updatedFields: string[]
 }> {
-  await ensureSchema()
-
-  const ctx = await buildContext(relationshipId, 40)
+  const ctx = await buildContext(userId, relationshipId, 40)
   if (!ctx.relationship || !ctx.partner) {
     throw new Error('관계 찾을 수 없음')
   }
@@ -161,7 +161,7 @@ ${current}`,
       escalationSpeed: derived.escalationSpeed || null,
       updatedAt: new Date(),
     })
-    .where(eq(relationships.id, relationshipId))
+    .where(and(eq(relationships.id, relationshipId), eq(relationships.userId, userId)))
 
   // 역프로파일링 trait를 self/partner actor에 저장 (덮어쓰기: 이 추론이 최신 관찰)
   const eventIds = ctx.events.map((e) => e.id)
@@ -172,7 +172,7 @@ ${current}`,
       await db
         .update(actors)
         .set({ inferredTraits: traits })
-        .where(eq(actors.id, ctx.self.id))
+        .where(and(eq(actors.id, ctx.self.id), eq(actors.userId, userId)))
     }
   }
   if (ctx.partner) {
@@ -181,7 +181,7 @@ ${current}`,
       await db
         .update(actors)
         .set({ inferredTraits: traits })
-        .where(eq(actors.id, ctx.partner.id))
+        .where(and(eq(actors.id, ctx.partner.id), eq(actors.userId, userId)))
     }
   }
 

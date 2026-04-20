@@ -1,7 +1,7 @@
 'use server'
 
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import {
@@ -14,45 +14,37 @@ import {
   relationships,
   type InferredTrait,
 } from '../db/schema'
-import { ensureSchema } from '../db/init'
 import { getSelfOrThrow } from './self'
+import { requireUserId } from '../supabase/server'
 
 /**
- * 목업 데이터 시드 — UI 검증용. 한 번 호출하면:
- *   - Self actor에 inferredTraits 채움
- *   - "서연 · 회사 후배"라는 파트너 1명 생성 (이미 있으면 skip)
- *   - Relationship 생성 (진행·dynamics 자연어 채움, partner traits)
- *   - Event 5개 (Fact/Why)
- *   - Action 1개 + Outcome 1개
- *   - Insight 2개 (active)
- *
- * 멱등성: 이미 "mock-partner" id 존재하면 그 관계 id 반환하고 재생성 스킵.
+ * 목업 데이터 시드 — UI 검증용. 유저별 격리. 같은 유저가 두 번 눌러도 기존 시드된 관계 reuse.
  */
 export async function seedMockData(): Promise<{ relationshipId: string; created: boolean }> {
-  await ensureSchema()
+  const uid = await requireUserId()
   const self = await getSelfOrThrow()
 
-  const partnerId = 'mock-partner-seoyeon'
+  const partnerId = `mock-partner-${uid.slice(0, 8)}`
   const [existingPartner] = await db
     .select()
     .from(actors)
-    .where(eq(actors.id, partnerId))
+    .where(and(eq(actors.id, partnerId), eq(actors.userId, uid)))
     .limit(1)
 
   if (existingPartner) {
     const [existingRel] = await db
       .select()
       .from(relationships)
-      .where(eq(relationships.partnerId, partnerId))
+      .where(and(eq(relationships.partnerId, partnerId), eq(relationships.userId, uid)))
       .limit(1)
     if (existingRel) {
       return { relationshipId: existingRel.id, created: false }
     }
   }
 
-  // 1. Self inferredTraits 채우기 (관찰 누적 UI 검증)
   const now = Date.now()
   const DAY = 24 * 60 * 60 * 1000
+
   const selfTraits: InferredTrait[] = [
     {
       observation: '갈등 시 먼저 사과하는 관대함 경향',
@@ -76,9 +68,11 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
       lastUpdated: now,
     },
   ]
-  await db.update(actors).set({ inferredTraits: selfTraits }).where(eq(actors.id, self.id))
+  await db
+    .update(actors)
+    .set({ inferredTraits: selfTraits })
+    .where(and(eq(actors.id, self.id), eq(actors.userId, uid)))
 
-  // 2. Partner 생성
   const partnerTraits: InferredTrait[] = [
     {
       observation: '보수적 가치관 — 가족·결혼 화제 자주 꺼냄',
@@ -105,6 +99,7 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
   if (!existingPartner) {
     await db.insert(actors).values({
       id: partnerId,
+      userId: uid,
       role: 'partner',
       displayName: '서연',
       rawNotes: '회사 2년차 후배. 친해진 건 프로젝트 끝날 때쯤.',
@@ -120,10 +115,10 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     })
   }
 
-  // 3. Relationship
   const relId = `rel-${randomUUID()}`
   await db.insert(relationships).values({
     id: relId,
+    userId: uid,
     partnerId,
     progress: 'exploring',
     exclusivity: 'unknown',
@@ -136,9 +131,9 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     status: 'active',
   })
 
-  // 4. Events — Fact/Why 5개
   const mkEvent = (offsetDays: number, type: string, fact: string, why: string | null) => ({
     id: `evt-${randomUUID()}`,
+    userId: uid,
     relationshipId: relId,
     timestamp: new Date(now - offsetDays * DAY),
     type,
@@ -180,10 +175,10 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     ),
   ])
 
-  // 5. Goal auto (legacy FK 호환)
   const goalId = `goal-${randomUUID()}`
   await db.insert(goals).values({
     id: goalId,
+    userId: uid,
     relationshipId: relId,
     category: 'auto',
     description: '(mock seed placeholder)',
@@ -193,7 +188,6 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     applicableLaws: [],
   })
 
-  // 6. Action + Outcome
   const actionId = `act-${randomUUID()}`
   const actionMd = `## 지금 상황
 3회차 만남 지나면서 상대가 주도권을 가져감 (손 먼저·다음 약속 먼저). 내가 조금 뒤로 빠지는 타이밍이 유리.
@@ -212,6 +206,7 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
 
   await db.insert(actionsTbl).values({
     id: actionId,
+    userId: uid,
     relationshipId: relId,
     goalId,
     source: 'ai_proposed',
@@ -224,6 +219,7 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
 
   await db.insert(outcomes).values({
     id: `out-${randomUUID()}`,
+    userId: uid,
     actionId,
     observedSignals: '최근 1일 이벤트: 어제 밤 15분 통화 (자연스러움)',
     relatedEventIds: [],
@@ -235,10 +231,10 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     triggeredActionIds: [],
   })
 
-  // 7. Insight 2개 (active)
   await db.insert(insights).values([
     {
       id: `ins-${randomUUID()}`,
+      userId: uid,
       scope: 'self_pattern',
       relationshipId: null,
       observation: '답장 빠른 내 패턴이 3회차 이후 투자 비대칭의 주 원인.',
@@ -248,6 +244,7 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
     },
     {
       id: `ins-${randomUUID()}`,
+      userId: uid,
       scope: 'relationship_specific',
       relationshipId: relId,
       observation:
@@ -266,17 +263,17 @@ export async function seedMockData(): Promise<{ relationshipId: string; created:
   return { relationshipId: relId, created: true }
 }
 
-/**
- * 시드 데이터 제거 — 파트너 id 기준으로 관계·events·actions·outcomes·goals 모두 cascade.
- */
 export async function unseedMockData(): Promise<{ removed: boolean }> {
-  await ensureSchema()
-  const partnerId = 'mock-partner-seoyeon'
-  const [partner] = await db.select().from(actors).where(eq(actors.id, partnerId)).limit(1)
+  const uid = await requireUserId()
+  const partnerId = `mock-partner-${uid.slice(0, 8)}`
+  const [partner] = await db
+    .select()
+    .from(actors)
+    .where(and(eq(actors.id, partnerId), eq(actors.userId, uid)))
+    .limit(1)
   if (!partner) return { removed: false }
 
-  // actor 삭제 시 relationships cascade → events/actions/goals/outcomes/insights cascade
-  await db.delete(actors).where(eq(actors.id, partnerId))
+  await db.delete(actors).where(and(eq(actors.id, partnerId), eq(actors.userId, uid)))
 
   revalidatePath('/')
   revalidatePath('/timeline')

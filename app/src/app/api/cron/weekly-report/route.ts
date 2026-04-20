@@ -2,19 +2,12 @@ import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import { relationships } from '@/lib/db/schema'
-import { ensureSchema } from '@/lib/db/init'
 import { generateWeeklyReport } from '@/lib/engine/coach'
 import { saveInsightsFromReport } from '@/lib/engine/insights'
 
 /**
- * 주간 리포트 자동 생성 — Vercel Cron.
- * 각 active relationship에 대해 generateWeeklyReport 실행 후
- * Insight 섹션을 파싱해 insights 테이블에 영속. 다음 전략 제안 맥락으로 자동 주입.
- *
- * 실행 조건 per relationship:
- *   - status = 'active'
- *
- * 호출 인증: `Authorization: Bearer $CRON_SECRET`.
+ * 주간 리포트 자동 생성 — Vercel Cron (일요일 21시).
+ * 각 active relationship에 대해 rel.userId 스코프로 실행.
  */
 export const maxDuration = 300
 
@@ -24,8 +17,6 @@ export async function GET(req: Request) {
   if (!process.env.CRON_SECRET || authHeader !== expected) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
-
-  await ensureSchema()
 
   const activeRels = await db
     .select()
@@ -41,8 +32,9 @@ export async function GET(req: Request) {
 
   for (const rel of activeRels) {
     try {
-      const { markdown } = await generateWeeklyReport(rel.id)
+      const { markdown } = await generateWeeklyReport(rel.userId, rel.id)
       const saved = await saveInsightsFromReport({
+        userId: rel.userId,
         relationshipId: rel.id,
         reportMarkdown: markdown,
       })

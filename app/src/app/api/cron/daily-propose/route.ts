@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
-import { desc, eq } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db/client'
 import { actions as actionsTbl, events, relationships } from '@/lib/db/schema'
-import { ensureSchema } from '@/lib/db/init'
 import { proposeStrategy } from '@/lib/engine/coach'
 
 /**
@@ -26,8 +25,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  await ensureSchema()
-
   const activeRels = await db
     .select()
     .from(relationships)
@@ -45,22 +42,22 @@ export async function GET(req: Request) {
 
   for (const rel of activeRels) {
     try {
-      // Events 수
       const evRows = await db
         .select({ id: events.id })
         .from(events)
-        .where(eq(events.relationshipId, rel.id))
+        .where(and(eq(events.relationshipId, rel.id), eq(events.userId, rel.userId)))
       if (evRows.length === 0) {
         results.push({ relationshipId: rel.id, status: 'skipped', reason: 'no_events' })
         continue
       }
 
-      // 마지막 Action 시점
       const lastAction = (
         await db
           .select()
           .from(actionsTbl)
-          .where(eq(actionsTbl.relationshipId, rel.id))
+          .where(
+            and(eq(actionsTbl.relationshipId, rel.id), eq(actionsTbl.userId, rel.userId))
+          )
           .orderBy(desc(actionsTbl.createdAt))
           .limit(1)
       )[0]
@@ -80,6 +77,7 @@ export async function GET(req: Request) {
       }
 
       const r = await proposeStrategy({
+        userId: rel.userId,
         relationshipId: rel.id,
         currentSituation: '(매일 자동 업데이트 · 최근 Event 기반)',
       })
