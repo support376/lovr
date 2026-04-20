@@ -6,7 +6,7 @@ import { db } from '../db/client'
 import { goals, type Goal } from '../db/schema'
 import { ensureSchema } from '../db/init'
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { evaluateGoal } from '../rules/ethics'
 import { getSelfOrThrow } from './self'
 import { actors } from '../db/schema'
@@ -62,8 +62,7 @@ export async function createGoalAction(input: {
   relationshipId: string
   partnerId: string
   category: Goal['category']
-  description: string
-  priority?: 'primary' | 'secondary'
+  description?: string
 }): Promise<{
   goalId: string
   ethicsStatus: string
@@ -84,13 +83,22 @@ export async function createGoalAction(input: {
     goalCategory: input.category,
   })
 
+  // 단일 활성 goal 정책 — 기존 activated goal 은 deprecate
+  const now = new Date()
+  await db
+    .update(goals)
+    .set({ deprecatedAt: now })
+    .where(
+      and(eq(goals.relationshipId, input.relationshipId), isNull(goals.deprecatedAt))
+    )
+
   const id = `goal-${randomUUID()}`
   await db.insert(goals).values({
     id,
     relationshipId: input.relationshipId,
     category: input.category,
-    description: input.description,
-    priority: input.priority ?? 'primary',
+    description: input.description ?? input.category,
+    priority: 'primary',
     ethicsStatus: ev.status,
     ethicsReasons: ev.results.map((r) => `[${r.ruleId}] ${r.reason}`),
     applicableLaws: ev.applicableLaws,
