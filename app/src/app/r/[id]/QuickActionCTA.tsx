@@ -32,14 +32,20 @@ export function QuickActionCTA({
     setErr(null)
     start(async () => {
       try {
-        await proposeStrategyAction({
+        const res = await proposeStrategyAction({
           relationshipId,
           goalId: primaryGoalId,
           currentSituation: '(최근 Event 및 관계 맥락 기반)',
         })
+        if (!res.ok) {
+          setErr(
+            `${res.error}${res.where ? `\n@ ${res.where}` : ''}`
+          )
+          return
+        }
         router.refresh()
       } catch (e) {
-        setErr((e as Error).message)
+        setErr((e as Error).message || '요청 실패')
       }
     })
   }
@@ -78,7 +84,7 @@ export function QuickActionCTA({
       </button>
 
       {err && (
-        <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2">
+        <div className="text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg p-2 whitespace-pre-wrap font-mono leading-relaxed">
           {err}
         </div>
       )}

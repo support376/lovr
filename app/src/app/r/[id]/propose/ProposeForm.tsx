@@ -35,7 +35,15 @@ export function ProposeForm({
           goalId,
           currentSituation: situation.trim(),
         })
-        setResult(r)
+        if (!r.ok) {
+          setErr(`${r.error}${r.where ? `\n@ ${r.where}` : ''}`)
+          return
+        }
+        setResult({
+          actionId: r.actionId,
+          markdown: r.markdown,
+          ethicsStatus: r.ethicsStatus,
+        })
       } catch (e) {
         setErr((e as Error).message)
       }

@@ -11,24 +11,30 @@ import { evaluateGoal } from '../rules/ethics'
 import { getSelfOrThrow } from './self'
 import { actors } from '../db/schema'
 
+export type ProposeResult =
+  | { ok: true; actionId: string; markdown: string; ethicsStatus: string }
+  | { ok: false; error: string; where?: string }
+
 export async function proposeStrategyAction(input: {
   relationshipId: string
   goalId: string
   currentSituation: string
-}) {
+}): Promise<ProposeResult> {
   try {
     const result = await engine.proposeStrategy(input)
     revalidatePath(`/r/${input.relationshipId}`)
-    return result
+    return { ok: true, ...result }
   } catch (e) {
-    console.error('[proposeStrategyAction]', {
-      input,
-      error: (e as Error).message,
-      stack: (e as Error).stack,
-    })
-    throw new Error(
-      `전략 생성 실패: ${(e as Error).message ?? 'unknown'}`
-    )
+    const msg = (e as Error).message ?? 'unknown'
+    const stack = (e as Error).stack ?? ''
+    console.error('[proposeStrategyAction]', { input, error: msg, stack })
+    // 에러 위치 힌트 추출 (stack 상위 1줄)
+    const where = stack
+      .split('\n')
+      .slice(1, 4)
+      .join(' | ')
+      .slice(0, 300)
+    return { ok: false, error: msg, where }
   }
 }
 
