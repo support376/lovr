@@ -78,12 +78,22 @@ intensity 강도:
       "conflict_press": 10,
       "conflict_soothe": 55
     },
-    "narrative": "3~5 문장. 상대 평상시 톤·주기·감정 처리 방식."
+    "narrative": "평상시 연락 주기는 저녁 8~11시 집중, 주말은 짧음. 직설적 감정 표현 꺼리고 농담·일상 화제로 방향 바꾼다. 관계 격상 제안에는 '천천히'로 속도 조절."
   },
-  "narrative": "모델 전체 3~5 문장 축약.",
+  "narrative": "서연은 평소 현상 유지 선호가 강하고, 인혁이 감정을 공개하거나 관계 격상을 제안할 때마다 감정을 숨기거나 화제를 전환한다. 3회 이상 반복된 패턴: 인혁 거리두기 → 서연 먼저 연락. 갈등 상황에서 인혁이 사과하면 일시 풀리지만 곧 이전 패턴으로 회귀.",
   "confidenceOverall": 50,
   "rationale": "주요 판단 근거 2~4줄."
 }
+
+# 언어 규약 (중요!)
+**narrative 두 개와 rationale 필드는 순수 한국어만.**
+- 축 ID (proximity_push, commit_hold, emotion_open 등) narrative 안에 **절대 노출 금지**.
+- 축 개념 언급할 땐 한국어로 풀어 쓴다: "접근", "거리두기", "감정 공개", "현상 유지" 등.
+- 영어 단어 섞지 말 것 (예외: 고유명사, goal ID).
+- "X", "Y", "aX+b" 같은 수식 표기도 narrative 에 쓰지 말 것.
+
+rules 필드의 xAxis/yAxis 는 당연히 축 ID 그대로 (구조 값).
+examples 는 원문 그대로 (유저 표현 보존).
 
 # 검증 체크리스트
 - 축 이름 정확히 위 8개 중 하나.
@@ -91,6 +101,7 @@ intensity 강도:
 - observations ≤ 전체 Event 개수.
 - confidence ∈ [0, 100] 정수. 샘플 수 대비 과대평가 금지.
 - rules 최대 6개 (중복 합치고 남은 것만).
+- narrative 에 축 ID·영문·수식 표기 없음 확인.
 - 증거 약한 규칙 빼라.
 
 # 주의
