@@ -3,17 +3,19 @@ import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import {
-  getCurrentRelationship,
   listRelationships,
   getRelationship,
 } from '@/lib/actions/relationships'
+import { getFocusRelationshipId, setFocusRelationship } from '@/lib/actions/focus'
 import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
+import { PartnerInlineEditor } from '@/app/r/[id]/PartnerInlineEditor'
+import { TargetSwitcher } from '@/components/TargetSwitcher'
 
 /**
- * 기록 탭 — 대화·사건 로그 전용. 분석·상태 카드는 /r/[id] 로 이동.
+ * 기록 탭 — 상대별 대화 · 이벤트 누적.
  */
 export default async function TimelinePage({
   searchParams,
@@ -25,8 +27,16 @@ export default async function TimelinePage({
 
   const sp = await searchParams
   const all = await listRelationships()
-  let focused = sp.rel ? await getRelationship(sp.rel) : await getCurrentRelationship()
-  if (!focused && all[0]) focused = all[0]
+
+  // 우선순위: ?rel=X > focus cookie > 첫번째
+  const focusId = await getFocusRelationshipId()
+  const preferredId = sp.rel ?? focusId ?? all[0]?.id ?? null
+  const focused = preferredId ? await getRelationship(preferredId) : null
+
+  // ?rel 로 바뀌었으면 focus 도 동기화
+  if (sp.rel && sp.rel !== focusId) {
+    await setFocusRelationship(sp.rel)
+  }
 
   const events = focused ? await listEvents(focused.id, 50) : []
 
@@ -34,11 +44,7 @@ export default async function TimelinePage({
     <>
       <PageHeader
         title="기록"
-        subtitle={
-          focused
-            ? `${focused.partner.displayName} · 대화 · 만남 · 사건`
-            : '먼저 관계를 등록해야 기록할 수 있어'
-        }
+        subtitle="상대별 대화 · 만남 · 메모"
         right={
           <Link
             href="/r/new"
@@ -50,57 +56,55 @@ export default async function TimelinePage({
         }
       />
 
-      <div className="px-5 pb-10 flex-1 flex flex-col gap-5">
-        {!focused ? (
+      <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
+        {all.length === 0 ? (
           <Empty
-            title="등록된 관계 없음"
-            subtitle="관계를 추가하면 여기서 대화·만남·메모를 쌓을 수 있어."
+            title="등록된 상대 없음"
+            subtitle="상대를 추가하면 대화·만남·메모를 쌓을 수 있어."
             action={
               <Link href="/r/new">
-                <Button>첫 관계 등록</Button>
+                <Button>
+                  <Plus size={16} /> 첫 상대 등록
+                </Button>
               </Link>
             }
           />
         ) : (
           <>
-            {all.length > 1 && (
-              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                {all.map((r) => (
-                  <Link
-                    key={r.id}
-                    href={`/timeline?rel=${r.id}`}
-                    className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border ${
-                      r.id === focused!.id
-                        ? 'bg-accent/15 border-accent/40 text-accent'
-                        : 'bg-surface-2 border-border text-muted'
-                    }`}
-                  >
-                    {r.partner.displayName}
-                  </Link>
-                ))}
-              </div>
-            )}
+            <div className="-mx-5">
+              <TargetSwitcher
+                relationships={all}
+                currentId={focused?.id ?? null}
+                buildHref={(id) => `/timeline?rel=${id}`}
+              />
+            </div>
 
-            <AddEventForm relationshipId={focused.id} />
+            {focused && (
+              <>
+                <PartnerInlineEditor rel={focused} showToggleButton={true} />
 
-            <section>
-              <div className="text-xs text-muted uppercase tracking-wider mb-2">
-                타임라인 ({events.length})
-              </div>
-              {events.length === 0 ? (
-                <Card>
-                  <div className="text-sm text-muted">
-                    아직 기록 없음. 위에서 추가하자.
+                <AddEventForm relationshipId={focused.id} />
+
+                <section>
+                  <div className="text-xs text-muted uppercase tracking-wider mb-2">
+                    타임라인 ({events.length})
                   </div>
-                </Card>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {events.map((e) => (
-                    <EventCard key={e.id} e={e} />
-                  ))}
-                </div>
-              )}
-            </section>
+                  {events.length === 0 ? (
+                    <Card>
+                      <div className="text-sm text-muted">
+                        아직 기록 없음. 위에서 추가하자.
+                      </div>
+                    </Card>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {events.map((e) => (
+                        <EventCard key={e.id} e={e} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>

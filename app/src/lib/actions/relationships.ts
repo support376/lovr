@@ -11,6 +11,7 @@ import {
   type Relationship,
 } from '../db/schema'
 import { requireUserId } from '../supabase/server'
+import { getFocusRelationshipId } from './focus'
 
 export async function listRelationships(): Promise<Array<Relationship & { partner: Actor }>> {
   const uid = await requireUserId()
@@ -51,12 +52,20 @@ export async function getRelationship(
   return { ...r, partner: p }
 }
 
-/** 가장 최근 업데이트된 active 관계를 "현재 focus"로 간주. */
+/**
+ * 현재 focus 된 관계.
+ * 우선순위: cookie focusRel > 가장 최근 updatedAt active 관계.
+ */
 export async function getCurrentRelationship(): Promise<
   (Relationship & { partner: Actor }) | null
 > {
   const all = await listRelationships()
-  return all.find((r) => r.status === 'active') ?? null
+  const focusId = await getFocusRelationshipId()
+  if (focusId) {
+    const focused = all.find((r) => r.id === focusId)
+    if (focused) return focused
+  }
+  return all.find((r) => r.status === 'active') ?? all[0] ?? null
 }
 
 export async function createRelationship(input: {

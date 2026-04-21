@@ -180,14 +180,64 @@ ${ctx.markdown}`
     triggeredActionIds: [],
   })
 
+  // 결과를 기록(Event) 에도 append — 타임라인에 자동 노출
+  try {
+    const eventId = `evt-${randomUUID()}`
+    await db.insert(events).values({
+      id: eventId,
+      userId,
+      relationshipId: action.relationshipId,
+      timestamp: new Date(),
+      type: 'recovery', // 결과 기록 이벤트 (기존 enum 활용)
+      content: userNote?.trim()
+        ? `**전략 결과 기록**\n\n${userNote.trim()}`
+        : `**전략 결과 기록**\n\n(메모 없이 결과만 기록)`,
+      selfNote: combined.slice(0, 2000),
+      sender: null,
+      attachments: [],
+      contextTags: ['outcome', 'from-strategy'],
+    })
+  } catch (e) {
+    // event 생성 실패해도 outcome 은 살려둠
+    console.error('[analyzeOutcome event append]', e)
+  }
+
   return { outcomeId: id, markdown: combined }
 }
 
-export async function markActionExecuted(userId: string, actionId: string): Promise<void> {
+export async function markActionExecuted(
+  userId: string,
+  actionId: string
+): Promise<void> {
   await db
     .update(actionsTbl)
     .set({ status: 'executed', executedAt: new Date() })
     .where(and(eq(actionsTbl.id, actionId), eq(actionsTbl.userId, userId)))
+
+  // 실행 완료 기록 — 타임라인에 마일스톤으로 노출
+  try {
+    const [action] = await db
+      .select()
+      .from(actionsTbl)
+      .where(and(eq(actionsTbl.id, actionId), eq(actionsTbl.userId, userId)))
+      .limit(1)
+    if (action) {
+      const eventId = `evt-${randomUUID()}`
+      await db.insert(events).values({
+        id: eventId,
+        userId,
+        relationshipId: action.relationshipId,
+        timestamp: new Date(),
+        type: 'milestone',
+        content: `**전략 실행**\n\n${action.content.slice(0, 300)}…`,
+        sender: null,
+        attachments: [],
+        contextTags: ['executed', 'from-strategy'],
+      })
+    }
+  } catch (e) {
+    console.error('[markActionExecuted event]', e)
+  }
 }
 
 export async function generateWeeklyReport(

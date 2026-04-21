@@ -2,12 +2,15 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { Zap } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
-import { getRelationship } from '@/lib/actions/relationships'
+import { getRelationship, listRelationships } from '@/lib/actions/relationships'
 import { listEvents } from '@/lib/actions/events'
+import { setFocusRelationship } from '@/lib/actions/focus'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DeriveStateButton } from './DeriveStateButton'
 import { MetricsCard } from './MetricsCard'
 import { TraitsBars } from './TraitsBars'
+import { TraitsChips } from './TraitsChips'
+import { TargetSwitcher } from '@/components/TargetSwitcher'
 import type { InferredTrait } from '@/lib/db/schema'
 
 const PROGRESS_KO: Record<string, string> = {
@@ -40,8 +43,15 @@ export default async function RelationshipProfilePage({
   const rel = await getRelationship(id)
   if (!rel) notFound()
 
+  // 진입 시 focus 동기화
+  await setFocusRelationship(id)
+
+  const all = await listRelationships()
+
   const partnerTraits: InferredTrait[] = rel.partner.inferredTraits ?? []
   const selfTraits: InferredTrait[] = self.inferredTraits ?? []
+
+  const events = await listEvents(id, 500)
 
   const dynamicsItems = [
     { k: '힘의 균형', v: rel.powerBalance },
@@ -50,11 +60,18 @@ export default async function RelationshipProfilePage({
     { k: '심화 속도', v: rel.escalationSpeed },
   ].filter((d) => d.v)
 
-  const events = await listEvents(id, 500)
-
   return (
     <>
-      <header className="px-5 pt-4 pb-3 flex items-start gap-3">
+      {/* 스위처 */}
+      <div className="pt-3 pb-1">
+        <TargetSwitcher
+          relationships={all}
+          currentId={id}
+          buildHref={(rid) => `/r/${rid}`}
+        />
+      </div>
+
+      <header className="px-5 pt-3 pb-3 flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold truncate">
             {rel.partner.displayName}
@@ -89,16 +106,24 @@ export default async function RelationshipProfilePage({
       </header>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {/* 재분석 버튼 */}
+        {/* 재분석 */}
         <div className="flex items-center justify-between">
           <div className="text-xs text-muted">Event 에서 자동 추출된 분석</div>
           <DeriveStateButton relationshipId={id} />
         </div>
 
-        {/* 대화 메트릭스 — sender 있는 event 기반 */}
+        {/* 키워드 요약 — 한 눈에 나 vs 상대 스타일 */}
+        <TraitsChips
+          selfName={self.displayName}
+          partnerName={rel.partner.displayName}
+          selfTraits={selfTraits}
+          partnerTraits={partnerTraits}
+        />
+
+        {/* 대화 메트릭스 */}
         <MetricsCard events={events} partnerName={rel.partner.displayName} />
 
-        {/* 관계 dynamics 4축 (자연어) */}
+        {/* 관계 dynamics 4축 */}
         {dynamicsItems.length > 0 && (
           <section>
             <div className="text-xs text-muted uppercase tracking-wider mb-2">
@@ -120,12 +145,13 @@ export default async function RelationshipProfilePage({
           </section>
         )}
 
-        {/* 나 vs 상대 Traits (바 + 자유 관찰) */}
-        <section>
-          <div className="text-xs text-muted uppercase tracking-wider mb-2">
-            나 vs 상대 · Event 기반 추출
-          </div>
-          <div className="grid grid-cols-1 gap-3">
+        {/* 점수 바 — 상세 보기 (접힘 가능) */}
+        <details className="group">
+          <summary className="cursor-pointer text-xs text-muted hover:text-accent flex items-center gap-1">
+            <span className="group-open:rotate-90 transition-transform">▸</span>
+            점수 상세
+          </summary>
+          <div className="mt-2 grid grid-cols-1 gap-3">
             <TraitsBars title="나" tone="accent-2" traits={selfTraits} />
             <TraitsBars
               title={rel.partner.displayName}
@@ -133,7 +159,7 @@ export default async function RelationshipProfilePage({
               traits={partnerTraits}
             />
           </div>
-        </section>
+        </details>
 
         {/* 상대 프로필 편집 */}
         <section>

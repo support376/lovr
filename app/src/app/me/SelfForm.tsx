@@ -14,9 +14,8 @@ const GENDER = [
 ]
 
 /**
- * 자가진단 X · 사실(Fact) + 요약 + 딜브레이커만 직접 입력.
- * 성격/가치관/이상형은 사용자가 자유 서술. MBTI·설문 토글 제거.
- * 내가 "어떤 사람인지"는 Event에서 역프로파일링된 inferredTraits로 표출.
+ * 나의 기본 프로필 — 사실(Fact) + 요약 + 딜브레이커.
+ * 자가진단 없음. 실제 행동 특성은 Event 역프로파일링 결과로 하단에 노출.
  */
 export function SelfForm({ initial }: { initial: Actor }) {
   const [name, setName] = useState(initial.displayName)
@@ -24,7 +23,6 @@ export function SelfForm({ initial }: { initial: Actor }) {
   const [gender, setGender] = useState(initial.gender ?? '')
   const [occupation, setOccupation] = useState(initial.occupation ?? '')
 
-  // 구 버전 분리 필드를 rawNotes로 합쳐서 1개 박스로 편집.
   const initialSummary = [
     initial.personalityNotes,
     initial.valuesNotes,
@@ -77,7 +75,6 @@ export function SelfForm({ initial }: { initial: Actor }) {
       }}
       className="flex flex-col gap-4"
     >
-      {/* 기본 fact */}
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-3">기본</div>
         <div className="flex flex-col gap-3">
@@ -119,12 +116,11 @@ export function SelfForm({ initial }: { initial: Actor }) {
         </div>
       </Card>
 
-      {/* 요약 서술 — 자유 서술 (자가진단 대체) */}
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">내 요약</div>
         <div className="text-[11px] text-muted mb-2 leading-relaxed">
-          성격·가치관·이상형·강점·약점을 <strong>사실(Fact)</strong> 위주로 자유롭게.
-          MBTI·퀴즈는 쓰지 않아. 실제 행동 특성은 아래 &ldquo;관찰 누적&rdquo;에서 Event로부터 자동 추출돼.
+          성격·가치관·이상형·강점·약점을 <strong>사실(Fact)</strong> 위주로 자유 서술.
+          실제 행동 특성은 아래 &ldquo;관찰 누적&rdquo;에서 Event 로부터 자동 추출.
         </div>
         <TextArea
           value={summary}
@@ -134,7 +130,6 @@ export function SelfForm({ initial }: { initial: Actor }) {
         />
       </Card>
 
-      {/* 딜브레이커 — 경계 조건이라 분리 */}
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">
           딜브레이커 (경계)
@@ -146,20 +141,25 @@ export function SelfForm({ initial }: { initial: Actor }) {
         />
       </Card>
 
-      {/* 역프로파일링 결과 — Event 기반 자동 추출 (읽기 전용) */}
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">
           관찰 누적 · 내 행동에서 추출
         </div>
         {traits.length === 0 ? (
           <div className="text-[11px] text-muted leading-relaxed">
-            아직 충분한 Event가 없음. 대화·사건을 기록하면 여기에 자동으로 &ldquo;이기적/관대함/진보/보수&rdquo; 같은 행동 축이 누적돼.
+            아직 충분한 Event 가 없음. 대화·사건을 기록하면 여기에 자동으로 &ldquo;이기적/관대함/진보/보수&rdquo; 같은 행동 축이 누적돼.
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {traits.map((t, i) => (
               <li key={i} className="text-xs leading-relaxed">
-                • {t.observation}
+                {t.axis ? (
+                  <span className="font-semibold text-accent mr-1">
+                    {t.axis}
+                    {typeof t.score === 'number' ? ` ${t.score}` : ''} ·
+                  </span>
+                ) : '• '}
+                {t.observation}
                 <span className="text-muted ml-1">({t.confidenceNarrative})</span>
               </li>
             ))}
