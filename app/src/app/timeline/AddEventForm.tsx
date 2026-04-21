@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Mic, Loader2 } from 'lucide-react'
+import { FileText, ImageIcon, Loader2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { addEvent, type EventType } from '@/lib/actions/events'
 import { detectFirstTimestamp, extractFromFile } from '@/lib/actions/transcribe'
@@ -62,16 +62,16 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
   const [timeStr, setTimeStr] = useState(initial.time)
   const [noDate, setNoDate] = useState(false)
   const [pending, start] = useTransition()
-  const [uploading, setUploading] = useState<null | 'kakao' | 'audio'>(null)
+  const [uploading, setUploading] = useState<null | 'text' | 'image'>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const router = useRouter()
-  const kakaoInputRef = useRef<HTMLInputElement>(null)
-  const audioInputRef = useRef<HTMLInputElement>(null)
+  const textInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const currentHint = TYPE_OPTIONS.find((o) => o.v === type)?.hint
 
-  const onFile = async (kind: 'kakao' | 'audio', file: File) => {
+  const onFile = async (kind: 'text' | 'image', file: File) => {
     setErr(null)
     setInfo(null)
     setUploading(kind)
@@ -85,22 +85,25 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
       }
       // content 에 기존 내용 있으면 뒤에 append
       setContent((prev) => (prev ? prev + '\n\n' + r.text : r.text))
-      // 카톡 파일이면 타입 자동 전환 + 첫 timestamp 탐지
-      if (r.kind === 'kakao') {
-        setType('chat')
-        const d = await detectFirstTimestamp(r.text)
-        if (d.ts) {
-          const t = toLocal(d.ts)
-          setDateStr(t.date)
-          setTimeStr(t.time)
-          setNoDate(false)
-          setInfo(`카톡 파일 처리됨 · 첫 메시지 시각 자동 반영`)
-        } else {
-          setInfo(`카톡 파일 처리됨 · 시각 탐지 실패 → 직접 입력`)
-        }
+      // 카톡 성격이면 타입 자동 전환 + 첫 timestamp 탐지
+      setType('chat')
+      const d = await detectFirstTimestamp(r.text)
+      if (d.ts) {
+        const t = toLocal(d.ts)
+        setDateStr(t.date)
+        setTimeStr(t.time)
+        setNoDate(false)
+        setInfo(
+          kind === 'image'
+            ? 'OCR 완료 · 첫 메시지 시각 자동 반영'
+            : '텍스트 파일 처리됨 · 첫 메시지 시각 자동 반영'
+        )
       } else {
-        setType('event')
-        setInfo('음성 변환 완료 (Whisper)')
+        setInfo(
+          kind === 'image'
+            ? 'OCR 완료 · 시각 탐지 실패 → 직접 입력'
+            : '텍스트 처리됨 · 시각 탐지 실패 → 직접 입력'
+        )
       }
     } catch (e) {
       setErr((e as Error).message)
@@ -213,52 +216,52 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
         {/* 업로드 도우미 */}
         <div className="flex gap-1.5 flex-wrap">
           <input
-            ref={kakaoInputRef}
+            ref={textInputRef}
             type="file"
             accept=".txt,.csv,.md,text/plain"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) onFile('kakao', f)
+              if (f) onFile('text', f)
               e.target.value = ''
             }}
           />
           <button
             type="button"
-            onClick={() => kakaoInputRef.current?.click()}
+            onClick={() => textInputRef.current?.click()}
             disabled={uploading !== null}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-[11px] text-muted hover:border-accent hover:text-accent disabled:opacity-40"
           >
-            {uploading === 'kakao' ? (
+            {uploading === 'text' ? (
               <Loader2 size={12} className="animate-spin" />
             ) : (
               <FileText size={12} />
             )}
-            카톡 .txt 파일
+            텍스트 파일 (.txt)
           </button>
           <input
-            ref={audioInputRef}
+            ref={imageInputRef}
             type="file"
-            accept="audio/*,.mp3,.m4a,.wav,.webm"
+            accept="image/*,.png,.jpg,.jpeg,.webp"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) onFile('audio', f)
+              if (f) onFile('image', f)
               e.target.value = ''
             }}
           />
           <button
             type="button"
-            onClick={() => audioInputRef.current?.click()}
+            onClick={() => imageInputRef.current?.click()}
             disabled={uploading !== null}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-2 border border-border text-[11px] text-muted hover:border-accent hover:text-accent disabled:opacity-40"
           >
-            {uploading === 'audio' ? (
+            {uploading === 'image' ? (
               <Loader2 size={12} className="animate-spin" />
             ) : (
-              <Mic size={12} />
+              <ImageIcon size={12} />
             )}
-            음성 파일 (전화녹음)
+            카톡 캡쳐 OCR
           </button>
         </div>
 
