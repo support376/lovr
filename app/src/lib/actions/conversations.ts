@@ -67,44 +67,59 @@ export async function appendConversationMessage(input: {
   revalidatePath('/')
 }
 
-export async function listConversations(
-  limit = 20,
-  relationshipId?: string | null
-): Promise<
-  Array<{
+export type ConvMetaResult = {
+  ok: true
+  items: Array<{
     id: string
     title: string
     updatedAt: number
     messageCount: number
     relationshipId: string | null
   }>
-> {
-  const uid = await requireUserId()
-  const where =
-    relationshipId !== undefined
-      ? and(
-          eq(conversations.userId, uid),
-          relationshipId === null
-            ? // Drizzle isNull alternative — keep null-filter via raw check
-              eq(conversations.relationshipId, '__never__')
-            : eq(conversations.relationshipId, relationshipId)
-        )
-      : eq(conversations.userId, uid)
+} | { ok: false; error: string }
 
-  const rows = await db
-    .select()
-    .from(conversations)
-    .where(where)
-    .orderBy(desc(conversations.updatedAt))
-    .limit(limit)
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    updatedAt:
-      r.updatedAt instanceof Date ? r.updatedAt.getTime() : Number(r.updatedAt),
-    messageCount: (r.messages ?? []).length,
-    relationshipId: r.relationshipId ?? null,
-  }))
+export async function listConversations(
+  limit = 20,
+  relationshipId?: string | null
+): Promise<ConvMetaResult> {
+  try {
+    const uid = await requireUserId()
+    const where =
+      relationshipId !== undefined
+        ? and(
+            eq(conversations.userId, uid),
+            relationshipId === null
+              ? eq(conversations.relationshipId, '__never__')
+              : eq(conversations.relationshipId, relationshipId)
+          )
+        : eq(conversations.userId, uid)
+
+    const rows = await db
+      .select()
+      .from(conversations)
+      .where(where)
+      .orderBy(desc(conversations.updatedAt))
+      .limit(limit)
+    return {
+      ok: true,
+      items: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        updatedAt:
+          r.updatedAt instanceof Date
+            ? r.updatedAt.getTime()
+            : Number(r.updatedAt),
+        messageCount: (r.messages ?? []).length,
+        relationshipId: r.relationshipId ?? null,
+      })),
+    }
+  } catch (e) {
+    console.error('[listConversations]', e)
+    return {
+      ok: false,
+      error: (e as Error).message || String(e),
+    }
+  }
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {

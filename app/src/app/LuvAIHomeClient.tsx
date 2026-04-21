@@ -42,7 +42,12 @@ export function LuvAIClientShell({
     initialized.current = true
     ;(async () => {
       try {
-        const items = await listConversations(20, relationshipId)
+        const res = await listConversations(20, relationshipId)
+        if (!res.ok) {
+          setInitError('listConversations: ' + res.error)
+          return
+        }
+        const items = res.items
         setList(items)
         if (items.length > 0) {
           await loadConversation(items[0].id)
@@ -77,19 +82,24 @@ export function LuvAIClientShell({
     setOpenHistory(false)
   }
 
+  async function refreshList() {
+    const res = await listConversations(20, relationshipId)
+    if (res.ok) setList(res.items)
+  }
+
   async function startNew() {
     const c = await createConversation({ relationshipId })
     setConversationId(c.id)
     setMessages([])
-    const items = await listConversations(20, relationshipId)
-    setList(items)
+    await refreshList()
     setOpenHistory(false)
   }
 
   async function removeConversation(id: string) {
     if (!confirm('이 대화 삭제?')) return
     await deleteConversation(id)
-    const items = await listConversations(20, relationshipId)
+    const res = await listConversations(20, relationshipId)
+    const items = res.ok ? res.items : []
     setList(items)
     if (conversationId === id) {
       if (items[0]) {
@@ -108,8 +118,7 @@ export function LuvAIClientShell({
         role: msg.role,
         content: msg.content,
       })
-      const items = await listConversations(20, relationshipId)
-      setList(items)
+      await refreshList()
     } catch {}
   }
 
