@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { X } from 'lucide-react'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import { updateSelf } from '@/lib/actions/self'
-import type { Actor, InferredTrait } from '@/lib/db/schema'
+import type { Actor } from '@/lib/db/schema'
 
 const GENDER = [
   { v: 'male', l: '남' },
@@ -14,32 +13,17 @@ const GENDER = [
 ]
 
 /**
- * 나의 기본 프로필 — 사실(Fact) + 요약 + 딜브레이커.
- * 자가진단 없음. 실제 행동 특성은 Event 역프로파일링 결과로 하단에 노출.
+ * MY 프로필 — 명목 fact 전용.
+ * 자가진단 · 요약 · 딜브레이커 · 강점/약점 전부 제거.
+ * 분석은 '분석' 탭에서 Event 기반 모델이 담당.
  */
 export function SelfForm({ initial }: { initial: Actor }) {
   const [name, setName] = useState(initial.displayName)
   const [age, setAge] = useState(initial.age?.toString() ?? '')
   const [gender, setGender] = useState(initial.gender ?? '')
   const [occupation, setOccupation] = useState(initial.occupation ?? '')
-
-  const initialSummary = [
-    initial.personalityNotes,
-    initial.valuesNotes,
-    initial.idealTypeNotes,
-    (initial.strengths ?? []).length > 0
-      ? `**강점**\n- ${(initial.strengths ?? []).join('\n- ')}`
-      : '',
-    (initial.weaknesses ?? []).length > 0
-      ? `**약점**\n- ${(initial.weaknesses ?? []).join('\n- ')}`
-      : '',
-    initial.rawNotes,
-  ]
-    .filter((s) => s && s.trim())
-    .join('\n\n')
-
-  const [summary, setSummary] = useState(initialSummary)
-  const [dealBreakers, setDealBreakers] = useState<string[]>(initial.dealBreakers ?? [])
+  const [assets, setAssets] = useState(initial.assetsNotes ?? '')
+  const [spending, setSpending] = useState(initial.spendingNotes ?? '')
 
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
@@ -54,8 +38,8 @@ export function SelfForm({ initial }: { initial: Actor }) {
           age: age ? parseInt(age, 10) : null,
           gender: gender || null,
           occupation: occupation.trim() || null,
-          dealBreakers,
-          rawNotes: summary.trim() || null,
+          assetsNotes: assets.trim() || null,
+          spendingNotes: spending.trim() || null,
         })
         setMsg('저장됨')
         router.refresh()
@@ -64,8 +48,6 @@ export function SelfForm({ initial }: { initial: Actor }) {
       }
     })
   }
-
-  const traits: InferredTrait[] = initial.inferredTraits ?? []
 
   return (
     <form
@@ -117,54 +99,31 @@ export function SelfForm({ initial }: { initial: Actor }) {
       </Card>
 
       <Card>
-        <div className="text-xs text-muted uppercase tracking-wider mb-2">내 요약</div>
+        <div className="text-xs text-muted uppercase tracking-wider mb-2">재산 / 자산</div>
         <div className="text-[11px] text-muted mb-2 leading-relaxed">
-          성격·가치관·이상형·강점·약점을 <strong>사실(Fact)</strong> 위주로 자유 서술.
-          실제 행동 특성은 아래 &ldquo;관찰 누적&rdquo;에서 Event 로부터 자동 추출.
+          연봉대·부동산·저축·현재 자산. fact 위주. 자유 서술.
         </div>
         <TextArea
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          rows={12}
-          placeholder={`예시:\n\n내향적, 친해지면 장난 많음. 깊은 대화 선호.\n커리어 > 결혼. 정직함 최우선.\n이상형: 자기 일 열심히 하고 가족 소중히 여기는 사람.`}
+          value={assets}
+          onChange={(e) => setAssets(e.target.value)}
+          rows={5}
+          placeholder={`예시:\n- 연봉 6000만원\n- 월세 85만원 거주\n- 저축 2천만원\n- 차 없음`}
         />
       </Card>
 
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">
-          딜브레이커 (경계)
+          지출 · 쓰는 것
         </div>
-        <TagInput
-          items={dealBreakers}
-          onChange={setDealBreakers}
-          placeholder="거짓말, 가족 험담, …"
+        <div className="text-[11px] text-muted mb-2 leading-relaxed">
+          평소 어디에 돈 쓰는지. 브랜드·취미·월 지출 구조.
+        </div>
+        <TextArea
+          value={spending}
+          onChange={(e) => setSpending(e.target.value)}
+          rows={5}
+          placeholder={`예시:\n- 카페 월 30만원, 식비 월 60만원\n- 옷: 무신사 자주\n- 취미: 클라이밍 월 15만원\n- 소비 유형: 계획형, 반반 적금`}
         />
-      </Card>
-
-      <Card>
-        <div className="text-xs text-muted uppercase tracking-wider mb-2">
-          관찰 누적 · 내 행동에서 추출
-        </div>
-        {traits.length === 0 ? (
-          <div className="text-[11px] text-muted leading-relaxed">
-            아직 충분한 Event 가 없음. 대화·사건을 기록하면 여기에 자동으로 &ldquo;이기적/관대함/진보/보수&rdquo; 같은 행동 축이 누적돼.
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-1.5">
-            {traits.map((t, i) => (
-              <li key={i} className="text-xs leading-relaxed">
-                {t.axis ? (
-                  <span className="font-semibold text-accent mr-1">
-                    {t.axis}
-                    {typeof t.score === 'number' ? ` ${t.score}` : ''} ·
-                  </span>
-                ) : '• '}
-                {t.observation}
-                <span className="text-muted ml-1">({t.confidenceNarrative})</span>
-              </li>
-            ))}
-          </ul>
-        )}
       </Card>
 
       {msg && <div className="text-xs text-muted text-center">{msg}</div>}
@@ -173,69 +132,5 @@ export function SelfForm({ initial }: { initial: Actor }) {
         {pending ? '저장 중…' : '저장'}
       </Button>
     </form>
-  )
-}
-
-function TagInput({
-  items,
-  onChange,
-  placeholder,
-}: {
-  items: string[]
-  onChange: (v: string[]) => void
-  placeholder?: string
-}) {
-  const [input, setInput] = useState('')
-  const add = () => {
-    const v = input.trim()
-    if (!v) return
-    onChange([...items, v])
-    setInput('')
-  }
-  const remove = (i: number) => onChange(items.filter((_, idx) => idx !== i))
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              add()
-            }
-          }}
-          placeholder={placeholder}
-          className="flex-1 rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent"
-        />
-        <button
-          type="button"
-          onClick={add}
-          className="px-3 rounded-lg bg-accent/20 text-accent text-xs font-semibold"
-        >
-          추가
-        </button>
-      </div>
-      {items.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map((t, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border bg-bad/15 text-bad border-bad/30"
-            >
-              🚫 {t}
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="opacity-60 hover:opacity-100"
-              >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Sparkles, Zap, Users, PencilLine, User } from 'lucide-react'
+import { Sparkles, Zap, PencilLine, User } from 'lucide-react'
 import clsx from 'clsx'
 
 const items = [
@@ -12,22 +12,16 @@ const items = [
     match: (p: string) => p === '/',
   },
   {
-    href: '/s',
-    label: '전략',
-    icon: Zap,
-    match: (p: string) => p === '/s' || p.startsWith('/s/'),
-  },
-  {
-    href: '/r',
-    label: '관계',
-    icon: Users,
-    match: (p: string) => p === '/r' || p.startsWith('/r/'),
-  },
-  {
     href: '/timeline',
     label: '기록',
     icon: PencilLine,
     match: (p: string) => p.startsWith('/timeline'),
+  },
+  {
+    href: '/r',
+    label: '분석',
+    icon: Zap,
+    match: (p: string) => p === '/r' || p.startsWith('/r/'),
   },
   {
     href: '/me',

@@ -19,7 +19,15 @@ type ConvMeta = {
   messageCount: number
 }
 
-export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }) {
+export function LuvAIClientShell({
+  targetAlias,
+  relationshipId,
+  hasModel,
+}: {
+  targetAlias: string | null
+  relationshipId: string | null
+  hasModel: boolean
+}) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<LuvAIMessage[]>([])
   const [list, setList] = useState<ConvMeta[]>([])
@@ -27,7 +35,6 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
   const apiRef = useRef<ChatApi | null>(null)
   const initialized = useRef(false)
 
-  // 최초 로드: 가장 최근 대화 or 새로
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
@@ -85,7 +92,6 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
     }
   }
 
-  // 메시지 변경 시 DB에 append (user + assistant 둘 다)
   const onMessageAppended = async (msg: LuvAIMessage) => {
     if (!conversationId) return
     try {
@@ -94,16 +100,16 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
         role: msg.role,
         content: msg.content,
       })
-      // list refresh (title·updatedAt 변동)
       const items = await listConversations(20)
       setList(items)
     } catch {}
   }
 
-  const setMessagesWithPersist = (fn: (prev: LuvAIMessage[]) => LuvAIMessage[]) => {
+  const setMessagesWithPersist = (
+    fn: (prev: LuvAIMessage[]) => LuvAIMessage[]
+  ) => {
     setMessages((prev) => {
       const next = fn(prev)
-      // 새로 추가된 메시지만 DB에 append
       if (next.length > prev.length) {
         const added = next.slice(prev.length)
         for (const m of added) onMessageAppended(m)
@@ -116,12 +122,10 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
 
   return (
     <>
-      {/* 상단 — 새로 / 이어하기 */}
       <div className="px-5 pt-3 pb-2 flex items-center gap-2">
         <div className="text-[11px] text-muted flex-1 truncate">
           {currentMeta?.title ?? '새 대화'}
         </div>
-
         <button
           onClick={() => setOpenHistory((v) => !v)}
           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-medium border bg-surface-2 border-border text-muted hover:border-accent/40"
@@ -130,7 +134,6 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
           이어하기
           <ChevronDown size={10} className={openHistory ? 'rotate-180' : ''} />
         </button>
-
         <button
           onClick={startNew}
           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-medium border bg-accent/10 border-accent/40 text-accent hover:bg-accent/15"
@@ -183,6 +186,8 @@ export function LuvAIClientShell({ targetAlias }: { targetAlias: string | null }
       <div className="px-5 pb-8 flex-1 flex flex-col">
         <LuvAIChat
           targetAlias={targetAlias}
+          relationshipId={relationshipId}
+          hasModel={hasModel}
           messages={messages}
           setMessages={setMessagesWithPersist}
           apiRef={apiRef}

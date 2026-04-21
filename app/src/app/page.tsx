@@ -26,6 +26,8 @@ export default async function LuvAIHome() {
       console.error('[LuvAIHome getCurrentRelationship]', e)
     }
 
+    const hasModel = !!(cur?.model && cur.model.rules && cur.model.rules.length > 0)
+
     return (
       <>
         {all.length > 0 && (
@@ -37,7 +39,11 @@ export default async function LuvAIHome() {
             />
           </div>
         )}
-        <LuvAIClientShell targetAlias={cur?.partner.displayName ?? null} />
+        <LuvAIClientShell
+          targetAlias={cur?.partner.displayName ?? null}
+          relationshipId={cur?.id ?? null}
+          hasModel={hasModel}
+        />
       </>
     )
   } catch (e) {

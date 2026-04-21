@@ -118,9 +118,9 @@ export function TargetSwitcher({
                 >
                   {stageKo}
                 </span>
-                {r.partner.mbti && (
-                  <span className="font-mono text-muted">
-                    {r.partner.mbti}
+                {r.partner.occupation && (
+                  <span className="text-muted truncate max-w-[80px]">
+                    {r.partner.occupation}
                   </span>
                 )}
               </div>

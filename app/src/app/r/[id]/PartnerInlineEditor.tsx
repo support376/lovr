@@ -3,11 +3,8 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Card, TextArea } from '@/components/ui'
-import {
-  updatePartner,
-  updateRelationship,
-} from '@/lib/actions/relationships'
-import type { Actor, InferredTrait, Relationship } from '@/lib/db/schema'
+import { updatePartner, updateRelationship } from '@/lib/actions/relationships'
+import type { Actor, Relationship } from '@/lib/db/schema'
 
 const GENDER_OPTIONS = [
   { v: '', l: '-' },
@@ -16,9 +13,17 @@ const GENDER_OPTIONS = [
   { v: 'other', l: '기타' },
 ]
 
+function dateInputValue(ts: Date | number | null | undefined): string {
+  if (!ts) return ''
+  const d = ts instanceof Date ? ts : new Date(Number(ts))
+  if (isNaN(d.getTime())) return ''
+  const p = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
 /**
- * 전략 탭 헤더 옆 "상세" 버튼으로 열리는 인라인 편집.
- * 관계 단계(progress)는 유저 직접 선택 X — Event 기반 derive 엔진이 기록.
+ * 상대 프로필 fact 편집. 자가진단 필드 전부 제거.
+ * 실제 '성향'은 ModelCard 가 Event 에서 추정.
  */
 export function PartnerInlineEditor({
   rel,
@@ -39,31 +44,37 @@ export function PartnerInlineEditor({
   const [msg, setMsg] = useState<string | null>(null)
   const router = useRouter()
 
-  // Partner fields
   const [name, setName] = useState(rel.partner.displayName)
   const [age, setAge] = useState(rel.partner.age?.toString() ?? '')
   const [gender, setGender] = useState(rel.partner.gender ?? '')
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
-  const [mbti, setMbti] = useState(rel.partner.mbti ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
+  const [constraintsText, setConstraintsText] = useState(
+    (rel.partner.knownConstraints ?? []).join(', ')
+  )
 
-  // Relationship fields
   const [description, setDescription] = useState(rel.description ?? '')
+  const [firstMet, setFirstMet] = useState(dateInputValue(rel.timelineStart))
 
   const submit = () => {
     setMsg(null)
     start(async () => {
       try {
+        const timelineStart = firstMet ? new Date(firstMet + 'T00:00:00') : null
         await updateRelationship(rel.id, {
           description: description.trim() || null,
+          timelineStart,
         } as never)
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
           age: age ? parseInt(age, 10) : null,
           gender: gender || null,
           occupation: occupation.trim() || null,
-          mbti: mbti || null,
           rawNotes: rawNotes.trim() || null,
+          knownConstraints: constraintsText
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
         })
         setMsg('저장됨')
         setOpen(false)
@@ -74,30 +85,42 @@ export function PartnerInlineEditor({
     })
   }
 
-  const traits: InferredTrait[] = rel.partner.inferredTraits ?? []
+  const firstMetDisplay = rel.timelineStart
+    ? new Date(
+        rel.timelineStart instanceof Date
+          ? rel.timelineStart
+          : Number(rel.timelineStart)
+      ).toLocaleDateString('ko-KR')
+    : null
+  const constraintList = rel.partner.knownConstraints ?? []
 
-  const body = (
-    <div className="mt-3 flex flex-col gap-3">
-      {/* 역프로파일링 요약 — Event에서 자동 추출. 읽기 전용. */}
-      {traits.length > 0 && (
-        <div className="rounded-lg bg-accent/5 border border-accent/20 p-2.5">
-          <div className="text-[10px] text-accent uppercase tracking-wider mb-1.5">
-            관찰 누적 · Event에서 추출
-          </div>
-          <ul className="flex flex-col gap-1">
-            {traits.map((t, i) => (
-              <li key={i} className="text-xs leading-relaxed">
-                • {t.observation}
-                <span className="text-muted ml-1">({t.confidenceNarrative})</span>
-              </li>
-            ))}
-          </ul>
+  const summary = (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-base font-bold">{rel.partner.displayName}</span>
+        {rel.partner.age && (
+          <span className="text-sm text-muted">{rel.partner.age}</span>
+        )}
+        {rel.partner.occupation && (
+          <span className="text-[11px] text-muted">· {rel.partner.occupation}</span>
+        )}
+      </div>
+      {(firstMetDisplay || constraintList.length > 0 || rel.description) && (
+        <div className="flex flex-col gap-0.5 text-[11px] text-muted leading-relaxed">
+          {firstMetDisplay && <div>📅 첫 만남 {firstMetDisplay}</div>}
+          {rel.description && (
+            <div className="whitespace-pre-wrap">💬 {rel.description}</div>
+          )}
+          {constraintList.length > 0 && <div>🏷 {constraintList.join(' · ')}</div>}
         </div>
       )}
+    </div>
+  )
 
-      {/* 이름 */}
+  const body = (
+    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">이름</span>
+        <span className="text-[10px] text-muted uppercase tracking-wider">이름</span>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -107,7 +130,7 @@ export function PartnerInlineEditor({
 
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">나이</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">나이</span>
           <input
             value={age}
             onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, ''))}
@@ -117,7 +140,7 @@ export function PartnerInlineEditor({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">성별</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">성별</span>
           <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
@@ -131,7 +154,7 @@ export function PartnerInlineEditor({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-muted">직업</span>
+          <span className="text-[10px] text-muted uppercase tracking-wider">직업</span>
           <input
             value={occupation}
             onChange={(e) => setOccupation(e.target.value)}
@@ -141,19 +164,22 @@ export function PartnerInlineEditor({
         </label>
       </div>
 
-      {/* MBTI는 단순 텍스트 (상대가 직접 알려준 경우만). 자가진단 토글 X. */}
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">MBTI (상대가 알려준 경우만)</span>
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          첫 만남 날짜
+        </span>
         <input
-          value={mbti}
-          onChange={(e) => setMbti(e.target.value.toUpperCase().slice(0, 4))}
-          placeholder="예) ENFP"
-          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm font-mono outline-none focus:border-accent"
+          type="date"
+          value={firstMet}
+          onChange={(e) => setFirstMet(e.target.value)}
+          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
         />
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted">관계 정의 (한 줄)</span>
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          관계 정의 (한 줄)
+        </span>
         <input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -162,12 +188,24 @@ export function PartnerInlineEditor({
         />
       </label>
 
+      <label className="flex flex-col gap-1">
+        <span className="text-[10px] text-muted uppercase tracking-wider">
+          제약 · 맥락 태그 (쉼표)
+        </span>
+        <input
+          value={constraintsText}
+          onChange={(e) => setConstraintsText(e.target.value)}
+          placeholder="기혼, 직장 동료, 연하"
+          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
+        />
+      </label>
+
       <TextArea
-        label="상대 메모"
-        rows={4}
+        label="상대 메모 (fact)"
+        rows={5}
         value={rawNotes}
         onChange={(e) => setRawNotes(e.target.value)}
-        placeholder="배경·성격·취향·공통 접점·과거 이력"
+        placeholder="배경·가족·공통 접점·과거 이력 등 객관 사실"
       />
 
       {msg && <div className="text-xs text-muted text-center">{msg}</div>}
@@ -179,16 +217,22 @@ export function PartnerInlineEditor({
   )
 
   if (!showToggleButton) {
-    return open ? <Card>{body}</Card> : null
+    return open ? (
+      <Card>
+        {summary}
+        {body}
+      </Card>
+    ) : null
   }
 
   return (
     <Card>
+      {summary}
       <button
         onClick={() => setOpen(!open)}
-        className="w-full text-left text-xs text-muted uppercase tracking-wider"
+        className="mt-3 w-full text-left text-[11px] text-accent hover:underline"
       >
-        상세 정보 {open ? '▲' : '▼'}
+        {open ? '접기 ▲' : '편집 ▼'}
       </button>
       {open && body}
     </Card>

@@ -4,100 +4,77 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, X, Save } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
-import {
-  deleteEvent,
-  updateEvent,
-  type EventType,
-  type EventSender,
-} from '@/lib/actions/events'
+import { deleteEvent, updateEvent, type EventType } from '@/lib/actions/events'
 import type { Event } from '@/lib/db/schema'
 
 const TYPE_LABEL: Record<string, string> = {
-  message: '카톡',
+  chat: '대화',
+  event: '사건',
+  note: '메모',
+  message: '카톡', // legacy
   call: '통화',
   meeting: '만남',
-  conversation: '대화',
-  note: '메모',
   milestone: '이벤트',
-  conflict: '갈등',
   recovery: '회복',
   external_info: '외부',
 }
 
-const EDIT_TYPES: Array<{ v: EventType; l: string; sender: boolean }> = [
-  { v: 'message', l: '카톡', sender: true },
-  { v: 'call', l: '통화', sender: true },
-  { v: 'note', l: '메모', sender: false },
+const EDIT_TYPES: Array<{ v: EventType; l: string }> = [
+  { v: 'chat', l: '대화' },
+  { v: 'event', l: '사건' },
+  { v: 'note', l: '메모' },
 ]
 
-function fmtDate(ts: number): string {
+function fmtDate(ts: number | null): string {
+  if (ts == null) return '-'
   const d = new Date(ts)
   return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
-function fmtDateFull(ts: number): string {
+function fmtDateFull(ts: number | null): string {
+  if (ts == null) return '날짜 불명'
   const d = new Date(ts)
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(
     d.getDate()
   ).padStart(2, '0')}`
 }
-function toInputDate(ts: number): string {
+function toInputDate(ts: number | null): string {
+  if (ts == null) return ''
   const d = new Date(ts)
   const p = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-function SenderBadge({ sender }: { sender: EventSender }) {
-  if (!sender) return null
-  const label = sender === 'me' ? '나' : '상대'
-  const cls =
-    sender === 'me'
-      ? 'bg-accent-2/15 text-accent-2 border-accent-2/30'
-      : 'bg-accent/15 text-accent border-accent/30'
-  return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${cls}`}>
-      {label}
-    </span>
-  )
-}
-
 export function EventCard({ e }: { e: Event }) {
+  const tsRaw =
+    e.timestamp == null
+      ? null
+      : e.timestamp instanceof Date
+      ? e.timestamp.getTime()
+      : Number(e.timestamp)
+
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(e.content)
-  const [why, setWhy] = useState(e.selfNote ?? '')
-  const [type, setType] = useState<EventType>(e.type as EventType)
-  const [sender, setSender] = useState<EventSender>((e.sender as EventSender) ?? 'me')
-  const [date, setDate] = useState(
-    toInputDate(e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp))
-  )
+  const [type, setType] = useState<EventType>((e.type as EventType) ?? 'chat')
+  const [date, setDate] = useState(toInputDate(tsRaw))
+  const [noDate, setNoDate] = useState(tsRaw == null)
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
-  const ts = e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp)
-  const eventSender = (e.sender ?? null) as EventSender
-
-  const titleMatch = e.content.match(/^\*\*(.+?)\*\*/)
-  const summary = titleMatch
-    ? titleMatch[1]
-    : e.content.split('\n')[0].slice(0, 50)
-
-  const currentType = EDIT_TYPES.find((o) => o.v === type)
-  const senderApplicable = currentType?.sender ?? false
+  const summary = e.content.split('\n')[0].slice(0, 60)
 
   const save = () => {
     if (!content.trim()) return
     setErr(null)
-    const newTs = new Date(date + 'T12:00').getTime()
+    const newTs = noDate ? null : new Date(date + 'T12:00').getTime()
     start(async () => {
       try {
         await updateEvent({
           id: e.id,
           content: content.trim(),
-          selfNote: why.trim() ? why.trim() : null,
           type,
           timestamp: newTs,
-          sender: senderApplicable ? sender : null,
         })
         setEditing(false)
         router.refresh()
@@ -138,48 +115,29 @@ export function EventCard({ e }: { e: Event }) {
             </button>
           ))}
         </div>
-
-        {senderApplicable && (
-          <div className="flex gap-1.5 mb-2">
-            <div className="shrink-0 py-1 px-1 text-[10px] text-muted">발신</div>
-            {(['me', 'partner'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSender(s)}
-                className={`flex-1 py-1 rounded text-[11px] border ${
-                  sender === s
-                    ? s === 'me'
-                      ? 'bg-accent-2/15 border-accent-2/40 text-accent-2'
-                      : 'bg-accent/15 border-accent/40 text-accent'
-                    : 'bg-surface-2 border-border text-muted'
-                }`}
-              >
-                {s === 'me' ? '나' : '상대'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <input
-          type="date"
-          value={date}
-          onChange={(ev) => setDate(ev.target.value)}
-          className="w-full rounded-lg bg-surface-2 border border-border px-3 py-1.5 text-xs outline-none focus:border-accent mb-2"
-        />
-        <div className="text-[11px] text-muted px-0.5 mb-1">사실</div>
+        <div className="flex gap-2 items-center mb-2">
+          <input
+            type="date"
+            value={date}
+            onChange={(ev) => setDate(ev.target.value)}
+            disabled={noDate}
+            className={`rounded-lg bg-surface-2 border border-border px-3 py-1.5 text-xs outline-none focus:border-accent ${
+              noDate ? 'opacity-50' : ''
+            }`}
+          />
+          <label className="flex items-center gap-1 text-[10px] text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={noDate}
+              onChange={(ev) => setNoDate(ev.target.checked)}
+            />
+            날짜 불명
+          </label>
+        </div>
         <textarea
           value={content}
           onChange={(ev) => setContent(ev.target.value)}
-          rows={6}
-          className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y"
-        />
-        <div className="text-[11px] text-muted px-0.5 mt-2 mb-1">왜 (선택)</div>
-        <textarea
-          value={why}
-          onChange={(ev) => setWhy(ev.target.value)}
-          rows={2}
-          placeholder="너의 해석·맥락"
+          rows={8}
           className="w-full rounded-lg bg-surface-2 border border-border px-3 py-2 text-sm outline-none focus:border-accent resize-y"
         />
         {err && (
@@ -193,10 +151,9 @@ export function EventCard({ e }: { e: Event }) {
             onClick={() => {
               setEditing(false)
               setContent(e.content)
-              setWhy(e.selfNote ?? '')
-              setType(e.type as EventType)
-              setSender((e.sender as EventSender) ?? 'me')
-              setDate(toInputDate(ts))
+              setType((e.type as EventType) ?? 'chat')
+              setDate(toInputDate(tsRaw))
+              setNoDate(tsRaw == null)
             }}
             disabled={pending}
             className="flex-1"
@@ -220,26 +177,16 @@ export function EventCard({ e }: { e: Event }) {
         <span className="px-1.5 py-0.5 rounded bg-surface-2 text-[11px] text-muted shrink-0">
           {TYPE_LABEL[e.type] ?? e.type}
         </span>
-        <SenderBadge sender={eventSender} />
         <span className="flex-1 min-w-0 text-sm truncate">{summary}</span>
-        <span className="text-[11px] text-muted shrink-0">{fmtDate(ts)}</span>
+        <span className="text-[11px] text-muted shrink-0">{fmtDate(tsRaw)}</span>
       </button>
 
       {expanded && (
         <div className="mt-2.5 pt-2.5 border-t border-border">
-          <div className="text-[11px] text-muted mb-2">{fmtDateFull(ts)}</div>
-          <div className="text-[11px] text-muted mb-1">사실</div>
+          <div className="text-[11px] text-muted mb-2">{fmtDateFull(tsRaw)}</div>
           <div className="text-sm whitespace-pre-wrap leading-relaxed mb-3">
             {e.content}
           </div>
-          {e.selfNote && (
-            <>
-              <div className="text-[11px] text-muted mb-1">왜</div>
-              <div className="text-sm whitespace-pre-wrap leading-relaxed mb-3 text-muted italic">
-                {e.selfNote}
-              </div>
-            </>
-          )}
           <div className="flex gap-2">
             <Button
               variant="secondary"

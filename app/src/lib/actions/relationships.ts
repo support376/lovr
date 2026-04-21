@@ -13,7 +13,9 @@ import {
 import { requireUserId } from '../supabase/server'
 import { getFocusRelationshipId } from '../server/focus'
 
-export async function listRelationships(): Promise<Array<Relationship & { partner: Actor }>> {
+export async function listRelationships(): Promise<
+  Array<Relationship & { partner: Actor }>
+> {
   const uid = await requireUserId()
   const rels = await db
     .select()
@@ -53,8 +55,7 @@ export async function getRelationship(
 }
 
 /**
- * 현재 focus 된 관계.
- * 우선순위: cookie focusRel > 가장 최근 updatedAt active 관계.
+ * 현재 focus 관계. 우선순위: focus cookie > 가장 최근 active > 첫번째.
  */
 export async function getCurrentRelationship(): Promise<
   (Relationship & { partner: Actor }) | null
@@ -73,7 +74,6 @@ export async function createRelationship(input: {
   partnerRawNotes?: string
   partnerKnownConstraints?: string[]
   progress?: string
-  exclusivity?: string
 }): Promise<{ relationshipId: string; partnerId: string }> {
   const uid = await requireUserId()
 
@@ -87,7 +87,6 @@ export async function createRelationship(input: {
     displayName: input.partnerName,
     rawNotes: input.partnerRawNotes ?? null,
     knownConstraints: input.partnerKnownConstraints ?? [],
-    inferredTraits: [],
   })
 
   await db.insert(relationships).values({
@@ -95,8 +94,6 @@ export async function createRelationship(input: {
     userId: uid,
     partnerId,
     progress: input.progress ?? 'observing',
-    exclusivity: input.exclusivity ?? 'unknown',
-    conflictState: 'healthy',
     status: 'active',
   })
 
@@ -107,11 +104,9 @@ export async function createRelationship(input: {
 
 export async function updateRelationship(
   id: string,
-  patch: Partial<Pick<Relationship,
-    'description' | 'style' | 'progress' | 'exclusivity' | 'conflictState' |
-    'powerBalance' | 'communicationPattern' | 'investmentAsymmetry' |
-    'escalationSpeed' | 'status'
-  >>
+  patch: Partial<
+    Pick<Relationship, 'description' | 'progress' | 'status' | 'timelineStart'>
+  >
 ): Promise<void> {
   const uid = await requireUserId()
   await db
@@ -128,7 +123,6 @@ export async function updatePartner(
     displayName?: string
     rawNotes?: string | null
     knownConstraints?: string[]
-    mbti?: string | null
     age?: number | null
     gender?: string | null
     occupation?: string | null
@@ -138,8 +132,8 @@ export async function updatePartner(
   const updates: Record<string, unknown> = {}
   if (patch.displayName !== undefined) updates.displayName = patch.displayName
   if (patch.rawNotes !== undefined) updates.rawNotes = patch.rawNotes
-  if (patch.knownConstraints !== undefined) updates.knownConstraints = patch.knownConstraints
-  if (patch.mbti !== undefined) updates.mbti = patch.mbti
+  if (patch.knownConstraints !== undefined)
+    updates.knownConstraints = patch.knownConstraints
   if (patch.age !== undefined) updates.age = patch.age
   if (patch.gender !== undefined) updates.gender = patch.gender
   if (patch.occupation !== undefined) updates.occupation = patch.occupation

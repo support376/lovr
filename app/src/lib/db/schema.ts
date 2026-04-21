@@ -1,20 +1,23 @@
 /**
  * LuvOS · Supabase Postgres 스키마 (Drizzle).
  *
- * 6노드 온톨로지:
- *   User · Target · Conversation · Event · Relationship State · Outcome.
+ * 핵심 개념:
+ *   Y = aX + b — 각 상대마다 stimulus-response 모델.
+ *   X 는 내 행동/말, Y 는 상대 반응.
+ *   a = X→Y 규칙 집합, b = 상대 baseline.
  *
- * 모든 user-scoped 테이블은 `user_id uuid references auth.users(id) on delete cascade`.
- * RLS는 SQL 스크립트(`docs/supabase_setup.sql`)에서 처리 — Drizzle 레벨에서는 타입만.
+ * 저장 위치:
+ *   relationships.model jsonb = { rules, baseline, updatedAt, evidenceCount }
+ *   events = X/Y 원자료 (append-only, 재분석시 reads 전체)
  *
- * actions.goalId는 레거시 호환용 placeholder (ontology 정리 후 엔진이 관계당 1개 "auto" goal을 조용히 생성).
+ * actors.role: 'self' | 'partner'. user_id uuid partitioning + RLS.
  */
 
 import { pgTable, text, integer, timestamp, jsonb, uuid } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 // ============================================================================
-// Actor — 사람. role='self'(유저 본인 1명) + 'partner' N명. user_id로 파티션.
+// Actor — 사람. self(유저 본인) + partner N명.
 // ============================================================================
 export const actors = pgTable('actors', {
   id: text('id').primaryKey(),
@@ -23,61 +26,32 @@ export const actors = pgTable('actors', {
     .notNull()
     .defaultNow(),
 
-  role: text('role').notNull(), // 'self' | 'partner' | 'ex' | 'competitor' | 'gatekeeper' | 'friend' | 'family'
+  role: text('role').notNull(), // 'self' | 'partner' | ...
   displayName: text('display_name').notNull(),
 
+  /** 자유 메모 — 상대에 대한 사실. self 는 사용 안 함. */
   rawNotes: text('raw_notes'),
 
+  /** 알려진 제약 — "기혼", "직장 동료" 같은 태그. */
   knownConstraints: jsonb('known_constraints')
     .$type<string[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 
-  inferredTraits: jsonb('inferred_traits')
-    .$type<InferredTrait[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-
-  mbti: text('mbti'),
+  // ========== 명목 fact (fact only) ==========
   age: integer('age'),
   gender: text('gender'),
-  orientation: text('orientation'),
-  experienceLevel: text('experience_level'),
   occupation: text('occupation'),
 
-  strengths: jsonb('strengths')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  weaknesses: jsonb('weaknesses')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  dealBreakers: jsonb('deal_breakers')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  idealTypeNotes: text('ideal_type_notes'),
-  personalityNotes: text('personality_notes'),
-  valuesNotes: text('values_notes'),
+  /** self 전용: 재산/자산 자유서술. */
+  assetsNotes: text('assets_notes'),
+  /** self 전용: 지출 패턴·쓰는 것. */
+  spendingNotes: text('spending_notes'),
 })
 
-export type InferredTrait = {
-  /** 선택적 축 라벨 — "외향성" / "불안형 애착" / "주도성" 등. 설정되면 score 와 짝으로 바 차트에. */
-  axis?: string
-  /** 선택적 0~100 점수. axis 와 함께만 의미 있음. */
-  score?: number
-  /** 축 그룹 — "personality" / "attachment" / "communication" 등. 미설정 시 기타. */
-  group?: string
-  observation: string
-  evidenceEventIds: string[]
-  confidenceNarrative: string
-  firstObserved: number
-  lastUpdated: number
-}
-
 // ============================================================================
-// Relationship — self ↔ partner.
+// Relationship — self ↔ partner 한 줄기.
+// model 이 이 row 의 핵심. 나머지는 메타.
 // ============================================================================
 export const relationships = pgTable('relationships', {
   id: text('id').primaryKey(),
@@ -93,24 +67,54 @@ export const relationships = pgTable('relationships', {
     .notNull()
     .references(() => actors.id, { onDelete: 'cascade' }),
 
+  /** 관계 단계 (유저 자율 태그, 추론 안 함). */
   progress: text('progress').notNull().default('observing'),
-  exclusivity: text('exclusivity').notNull().default('unknown'),
-  conflictState: text('conflict_state').notNull().default('healthy'),
 
+  /** "직장 후임" 같은 한 줄 관계 정의. */
   description: text('description'),
-  style: text('style'),
 
-  powerBalance: text('power_balance'),
-  communicationPattern: text('communication_pattern'),
-  investmentAsymmetry: text('investment_asymmetry'),
-  escalationSpeed: text('escalation_speed'),
+  /**
+   * Y = aX + b 모델.
+   * rules: "내가 X → 상대가 Y" 조건부 규칙들 (= a)
+   * baseline: X 무관 상대 디폴트 톤 (= b)
+   * confidence: 증거 수 기반 0~100
+   */
+  model: jsonb('model')
+    .$type<RelationshipModel | null>()
+    .default(sql`null`),
 
   timelineStart: timestamp('timeline_start', { withTimezone: true, mode: 'date' }),
-  status: text('status').notNull().default('active'),
+  status: text('status').notNull().default('active'), // 'active' | 'paused' | 'ended'
 })
 
+export type RelationshipRule = {
+  /** 내가 하는 행동/말 */
+  x: string
+  /** 상대의 전형적 반응 */
+  y: string
+  /** 관찰 횟수 (evidence count) */
+  observations: number
+  /** 0~100 신뢰도 (증거/일관성 기반) */
+  confidence: number
+  /** 지지하는 event id 목록 */
+  evidenceEventIds: string[]
+  /** 마지막 갱신 시각 (ms) */
+  lastUpdated: number
+}
+
+export type RelationshipModel = {
+  rules: RelationshipRule[]
+  /** 상대 baseline — 자연어 2~4 문장. X 무관 디폴트 경향. */
+  baseline: string
+  /** 모델 전체 신뢰도 (evidence count 기반 0~100) */
+  confidence: number
+  updatedAt: number
+  /** 모델 추출에 쓴 event 개수 */
+  evidenceCount: number
+}
+
 // ============================================================================
-// Event — 원자료. append-only. raw markdown.
+// Event — X / Y 원자료. append-only.
 // ============================================================================
 export const events = pgTable('events', {
   id: text('id').primaryKey(),
@@ -119,25 +123,30 @@ export const events = pgTable('events', {
     .notNull()
     .defaultNow(),
 
-  timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' }).notNull(),
+  /** 실제 발생 시각. null 이면 '시간 불명 — 덩어리 대화'. */
+  timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' }),
 
   relationshipId: text('relationship_id')
     .notNull()
     .references(() => relationships.id, { onDelete: 'cascade' }),
 
+  /**
+   * 'chat' — 카톡 덩어리 or 단일 메시지
+   * 'event' — 실제 사건 (만남·이벤트·전략결과)
+   * 'note'  — 내 메모
+   */
   type: text('type').notNull(),
+
   content: text('content').notNull(),
-  transcript: text('transcript'),
 
-  /** 발신자 — 'me' | 'partner' | null. 카톡·통화 등 메시지 성격 이벤트에서 채워짐. */
-  sender: text('sender'),
-
+  /**
+   * 첨부 파일 URL 배열 (Supabase Storage screenshots bucket).
+   * 카톡 캡쳐 업로드.
+   */
   attachments: jsonb('attachments')
     .$type<string[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
-
-  selfNote: text('self_note'),
 
   contextTags: jsonb('context_tags')
     .$type<string[]>()
@@ -146,37 +155,7 @@ export const events = pgTable('events', {
 })
 
 // ============================================================================
-// Goal — 레거시 placeholder. UI에는 노출 안 되고 엔진이 관계당 1개 'auto' 유지.
-// ============================================================================
-export const goals = pgTable('goals', {
-  id: text('id').primaryKey(),
-  userId: uuid('user_id').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
-    .notNull()
-    .defaultNow(),
-  deprecatedAt: timestamp('deprecated_at', { withTimezone: true, mode: 'date' }),
-
-  relationshipId: text('relationship_id')
-    .notNull()
-    .references(() => relationships.id, { onDelete: 'cascade' }),
-
-  category: text('category').notNull(),
-  description: text('description').notNull(),
-  priority: text('priority').notNull().default('primary'),
-
-  ethicsStatus: text('ethics_status').notNull().default('ok'),
-  ethicsReasons: jsonb('ethics_reasons')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  applicableLaws: jsonb('applicable_laws')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-})
-
-// ============================================================================
-// Action — AI 제안 or 유저 실행 행동 단위.
+// Action — AI 제안 행동. 결과 시뮬레이션 / 실행 로그.
 // ============================================================================
 export const actions = pgTable('actions', {
   id: text('id').primaryKey(),
@@ -189,24 +168,15 @@ export const actions = pgTable('actions', {
     .notNull()
     .references(() => relationships.id, { onDelete: 'cascade' }),
 
-  goalId: text('goal_id')
-    .notNull()
-    .references(() => goals.id, { onDelete: 'cascade' }),
-
-  source: text('source').notNull(),
+  source: text('source').notNull(), // 'ai_proposed' | 'self_initiated'
   proposedAt: timestamp('proposed_at', { withTimezone: true, mode: 'date' })
     .notNull()
     .defaultNow(),
   executedAt: timestamp('executed_at', { withTimezone: true, mode: 'date' }),
 
+  /** 전략 전체 markdown. */
   content: text('content').notNull(),
   status: text('status').notNull().default('proposed'),
-
-  ethicsStatus: text('ethics_status').notNull().default('ok'),
-  ethicsReasons: jsonb('ethics_reasons')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
 })
 
 // ============================================================================
@@ -223,30 +193,12 @@ export const outcomes = pgTable('outcomes', {
     .notNull()
     .references(() => actions.id, { onDelete: 'cascade' }),
 
-  observedSignals: text('observed_signals').notNull(),
-  relatedEventIds: jsonb('related_event_ids')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-
-  goalProgress: text('goal_progress').notNull(),
-  surpriseLevel: text('surprise_level').notNull(),
-
   narrative: text('narrative').notNull(),
-
-  lessons: jsonb('lessons')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-
-  triggeredActionIds: jsonb('triggered_action_ids')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
+  goalProgress: text('goal_progress').notNull(), // advanced | stagnant | regressed | unclear
 })
 
 // ============================================================================
-// Insight — 반복 패턴 학습 단위.
+// Insight — cross-relationship 패턴 (Phase B).
 // ============================================================================
 export const insights = pgTable('insights', {
   id: text('id').primaryKey(),
@@ -255,22 +207,11 @@ export const insights = pgTable('insights', {
     .notNull()
     .defaultNow(),
 
-  scope: text('scope').notNull(),
+  scope: text('scope').notNull(), // 'relationship_specific' | 'self_pattern' | 'cross_relationship'
   relationshipId: text('relationship_id').references(() => relationships.id, {
     onDelete: 'cascade',
   }),
-
   observation: text('observation').notNull(),
-
-  supportingOutcomeIds: jsonb('supporting_outcome_ids')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  supportingEventIds: jsonb('supporting_event_ids')
-    .$type<string[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-
   status: text('status').notNull().default('active'),
 })
 
@@ -289,26 +230,26 @@ export const conversations = pgTable('conversations', {
 
   relationshipId: text('relationship_id'),
   title: text('title').notNull().default('새 대화'),
-
   messages: jsonb('messages')
     .$type<Array<{ role: 'user' | 'assistant'; content: string; at: number }>>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 })
 
-export type Conversation = typeof conversations.$inferSelect
-export type NewConversation = typeof conversations.$inferInsert
+// ============================================================================
+// Type exports
+// ============================================================================
 export type Actor = typeof actors.$inferSelect
 export type NewActor = typeof actors.$inferInsert
 export type Relationship = typeof relationships.$inferSelect
 export type NewRelationship = typeof relationships.$inferInsert
 export type Event = typeof events.$inferSelect
 export type NewEvent = typeof events.$inferInsert
-export type Goal = typeof goals.$inferSelect
-export type NewGoal = typeof goals.$inferInsert
 export type Action = typeof actions.$inferSelect
 export type NewAction = typeof actions.$inferInsert
 export type Outcome = typeof outcomes.$inferSelect
 export type NewOutcome = typeof outcomes.$inferInsert
 export type Insight = typeof insights.$inferSelect
 export type NewInsight = typeof insights.$inferInsert
+export type Conversation = typeof conversations.$inferSelect
+export type NewConversation = typeof conversations.$inferInsert

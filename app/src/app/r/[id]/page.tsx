@@ -1,16 +1,9 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Zap } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship, listRelationships } from '@/lib/actions/relationships'
-import { listEvents } from '@/lib/actions/events'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
-import { DeriveStateButton } from './DeriveStateButton'
-import { MetricsCard } from './MetricsCard'
-import { TraitsBars } from './TraitsBars'
-import { TraitsChips } from './TraitsChips'
+import { ModelCard } from './ModelCard'
 import { TargetSwitcher } from '@/components/TargetSwitcher'
-import type { InferredTrait } from '@/lib/db/schema'
 
 const PROGRESS_KO: Record<string, string> = {
   unknown: '판단 불가',
@@ -30,7 +23,7 @@ const PROGRESS_KO: Record<string, string> = {
   reconnection: '재연결',
 }
 
-export default async function RelationshipProfilePage({
+export default async function RelationshipAnalysisPage({
   params,
 }: {
   params: Promise<{ id: string }>
@@ -44,21 +37,8 @@ export default async function RelationshipProfilePage({
 
   const all = await listRelationships()
 
-  const partnerTraits: InferredTrait[] = rel.partner.inferredTraits ?? []
-  const selfTraits: InferredTrait[] = self.inferredTraits ?? []
-
-  const events = await listEvents(id, 500)
-
-  const dynamicsItems = [
-    { k: '힘의 균형', v: rel.powerBalance },
-    { k: '연락 패턴', v: rel.communicationPattern },
-    { k: '투자 비대칭', v: rel.investmentAsymmetry },
-    { k: '심화 속도', v: rel.escalationSpeed },
-  ].filter((d) => d.v)
-
   return (
     <>
-      {/* 스위처 */}
       <div className="pt-3 pb-1">
         <TargetSwitcher
           relationships={all}
@@ -67,100 +47,44 @@ export default async function RelationshipProfilePage({
         />
       </div>
 
-      <header className="px-5 pt-3 pb-3 flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">
-            {rel.partner.displayName}
-            {rel.partner.age ? (
-              <span className="text-muted font-normal text-lg ml-1">
-                ({rel.partner.age})
-              </span>
-            ) : null}
-          </h1>
-          <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-            <span className="px-2 py-0.5 rounded-full bg-accent/20 text-accent font-medium">
-              {PROGRESS_KO[rel.progress] ?? rel.progress}
+      <header className="px-5 pt-3 pb-3">
+        <h1 className="text-2xl font-bold truncate">
+          {rel.partner.displayName}
+          {rel.partner.age ? (
+            <span className="text-muted font-normal text-lg ml-1">
+              ({rel.partner.age})
             </span>
-            {rel.partner.occupation && (
-              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted">
-                {rel.partner.occupation}
-              </span>
-            )}
-            {rel.description && (
-              <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted truncate max-w-[180px]">
-                {rel.description}
-              </span>
-            )}
-          </div>
+          ) : null}
+        </h1>
+        <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
+          <span className="px-2 py-0.5 rounded-full bg-accent/20 text-accent font-medium">
+            {PROGRESS_KO[rel.progress] ?? rel.progress}
+          </span>
+          {rel.partner.occupation && (
+            <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted">
+              {rel.partner.occupation}
+            </span>
+          )}
+          {rel.description && (
+            <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted truncate max-w-[180px]">
+              {rel.description}
+            </span>
+          )}
         </div>
-        <Link
-          href={`/s/${id}`}
-          className="shrink-0 inline-flex items-center gap-1 text-xs text-white font-medium px-3 py-2 rounded-lg bg-accent hover:brightness-110"
-        >
-          <Zap size={13} /> 전략
-        </Link>
       </header>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {/* 재분석 */}
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-muted">Event 에서 자동 추출된 분석</div>
-          <DeriveStateButton relationshipId={id} />
-        </div>
-
-        {/* 키워드 요약 — 한 눈에 나 vs 상대 스타일 */}
-        <TraitsChips
-          selfName={self.displayName}
+        {/* Y = aX + b 모델 카드 — 이 화면의 메인 */}
+        <ModelCard
+          relationshipId={id}
+          model={rel.model}
           partnerName={rel.partner.displayName}
-          selfTraits={selfTraits}
-          partnerTraits={partnerTraits}
         />
 
-        {/* 대화 메트릭스 */}
-        <MetricsCard events={events} partnerName={rel.partner.displayName} />
-
-        {/* 관계 dynamics 4축 */}
-        {dynamicsItems.length > 0 && (
-          <section>
-            <div className="text-xs text-muted uppercase tracking-wider mb-2">
-              관계 다이내믹
-            </div>
-            <div className="flex flex-col gap-2">
-              {dynamicsItems.map((d) => (
-                <div
-                  key={d.k}
-                  className="rounded-xl border border-border bg-surface-2 px-3 py-2.5"
-                >
-                  <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">
-                    {d.k}
-                  </div>
-                  <div className="text-sm leading-relaxed">{d.v}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* 점수 바 — 상세 보기 (접힘 가능) */}
-        <details className="group">
-          <summary className="cursor-pointer text-xs text-muted hover:text-accent flex items-center gap-1">
-            <span className="group-open:rotate-90 transition-transform">▸</span>
-            점수 상세
-          </summary>
-          <div className="mt-2 grid grid-cols-1 gap-3">
-            <TraitsBars title="나" tone="accent-2" traits={selfTraits} />
-            <TraitsBars
-              title={rel.partner.displayName}
-              tone="accent"
-              traits={partnerTraits}
-            />
-          </div>
-        </details>
-
-        {/* 상대 프로필 편집 */}
+        {/* 상대 프로필 — 직접 입력 */}
         <section>
           <div className="text-xs text-muted uppercase tracking-wider mb-2">
-            {rel.partner.displayName} 프로필 (직접 입력)
+            {rel.partner.displayName} 프로필 (fact)
           </div>
           <PartnerInlineEditor rel={rel} open={true} showToggleButton={false} />
         </section>

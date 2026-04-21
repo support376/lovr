@@ -30,21 +30,16 @@ export type SelfInput = {
   displayName?: string
   rawNotes?: string | null
   knownConstraints?: string[]
-  mbti?: string | null
   age?: number | null
   gender?: string | null
-  orientation?: string | null
-  experienceLevel?: string | null
   occupation?: string | null
-  strengths?: string[]
-  weaknesses?: string[]
-  dealBreakers?: string[]
-  idealTypeNotes?: string | null
-  personalityNotes?: string | null
-  valuesNotes?: string | null
+  assetsNotes?: string | null
+  spendingNotes?: string | null
 }
 
-export async function createSelf(input: SelfInput & { displayName: string }): Promise<Actor> {
+export async function createSelf(
+  input: SelfInput & { displayName: string }
+): Promise<Actor> {
   const uid = await requireUserId()
   const existing = await getSelf()
   if (existing) return updateSelf(input)
@@ -58,19 +53,11 @@ export async function createSelf(input: SelfInput & { displayName: string }): Pr
       displayName: input.displayName,
       rawNotes: input.rawNotes ?? null,
       knownConstraints: input.knownConstraints ?? [],
-      inferredTraits: [],
-      mbti: input.mbti ?? null,
       age: input.age ?? null,
       gender: input.gender ?? null,
-      orientation: input.orientation ?? null,
-      experienceLevel: input.experienceLevel ?? null,
       occupation: input.occupation ?? null,
-      strengths: input.strengths ?? [],
-      weaknesses: input.weaknesses ?? [],
-      dealBreakers: input.dealBreakers ?? [],
-      idealTypeNotes: input.idealTypeNotes ?? null,
-      personalityNotes: input.personalityNotes ?? null,
-      valuesNotes: input.valuesNotes ?? null,
+      assetsNotes: input.assetsNotes ?? null,
+      spendingNotes: input.spendingNotes ?? null,
     })
     .returning()
 
@@ -82,18 +69,11 @@ const ALLOWED_FIELDS = [
   'displayName',
   'rawNotes',
   'knownConstraints',
-  'mbti',
   'age',
   'gender',
-  'orientation',
-  'experienceLevel',
   'occupation',
-  'strengths',
-  'weaknesses',
-  'dealBreakers',
-  'idealTypeNotes',
-  'personalityNotes',
-  'valuesNotes',
+  'assetsNotes',
+  'spendingNotes',
 ] as const
 
 export async function updateSelf(input: SelfInput): Promise<Actor> {
