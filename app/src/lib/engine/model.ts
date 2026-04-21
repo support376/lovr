@@ -98,17 +98,31 @@ function parseBaseline(raw: RawBaseline | undefined): RelationshipBaseline {
 function parseRules(
   raw: RawRule[] | undefined,
   evidenceIds: string[],
+  evidenceCount: number,
   at: number
 ): RelationshipRule[] {
   if (!Array.isArray(raw)) return []
   const rules: RelationshipRule[] = []
+  const seen = new Set<string>() // dedupe by xAxis→yAxis key
   for (const r of raw) {
     if (!isAxis(r.xAxis) || !isAxis(r.yAxis)) continue
+    const key = `${r.xAxis}→${r.yAxis}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    // intensity 양수만 (음수면 절댓값)
+    const rawIntensity =
+      typeof r.intensity === 'number'
+        ? Math.abs(r.intensity)
+        : Math.abs(parseFloat((r.intensity ?? '50') as string))
     rules.push({
       xAxis: r.xAxis,
       yAxis: r.yAxis,
-      intensity: clampInt(r.intensity, 0, -100, 100),
-      observations: clampInt(r.observations, 1, 1, 1000),
+      intensity: clampInt(rawIntensity, 50, 0, 100),
+      // observations 는 evidenceCount 초과 금지
+      observations: Math.min(
+        evidenceCount,
+        clampInt(r.observations, 1, 1, Math.max(1, evidenceCount))
+      ),
       confidence: clampInt(r.confidence, 50, 0, 100),
       examplesX: Array.isArray(r.examplesX)
         ? r.examplesX.filter((s): s is string => typeof s === 'string').slice(0, 3)
@@ -119,7 +133,7 @@ function parseRules(
       evidenceEventIds: evidenceIds,
       lastUpdated: at,
     })
-    if (rules.length >= 8) break
+    if (rules.length >= 6) break
   }
   return rules
 }
@@ -202,7 +216,7 @@ export async function extractRelationshipModel(
 
   const now = Date.now()
   const evidenceIds = evList.map((e) => e.id)
-  const rules = parseRules(parsed.rules, evidenceIds, now)
+  const rules = parseRules(parsed.rules, evidenceIds, evList.length, now)
   const baseline = parseBaseline(parsed.baseline)
   const confidenceOverall = clampInt(parsed.confidenceOverall, 50, 0, 100)
 

@@ -110,9 +110,7 @@ export function ModelCard({
             a · 내가 X 하면 → 반응 Y
           </div>
           {sortedRules.map((r, i) => {
-            const sign = r.intensity >= 0 ? '+' : ''
-            const barPct = Math.abs(r.intensity)
-            const barDirection = r.intensity >= 0 ? 'right' : 'left'
+            const barPct = Math.max(0, Math.min(100, r.intensity))
             return (
               <div
                 key={i}
@@ -132,29 +130,16 @@ export function ModelCard({
                   <span className="font-semibold text-accent">
                     {AXIS_LABEL[r.yAxis]}
                   </span>
-                  <span
-                    className={`ml-2 font-mono text-[11px] ${
-                      r.intensity >= 0 ? 'text-good' : 'text-bad'
-                    }`}
-                  >
-                    {sign}
+                  <span className="ml-2 font-mono text-[11px] text-muted">
                     {r.intensity}
                   </span>
                 </div>
-                {/* intensity 바 (양방향) */}
-                <div className="mt-2 h-1 rounded-full bg-surface overflow-hidden relative">
+                <div className="mt-2 h-1 rounded-full bg-surface overflow-hidden">
                   <div
-                    className={`absolute h-full ${
-                      r.intensity >= 0 ? 'bg-good' : 'bg-bad'
-                    }`}
-                    style={{
-                      width: `${barPct / 2}%`,
-                      [barDirection === 'right' ? 'left' : 'right']: '50%',
-                    }}
+                    className="bg-accent h-full"
+                    style={{ width: `${barPct}%` }}
                   />
-                  <div className="absolute top-0 left-1/2 w-px h-full bg-border" />
                 </div>
-                {/* 예시 */}
                 {(r.examplesX[0] || r.examplesY[0]) && (
                   <details className="mt-2 text-[10px] text-muted group [&_summary::-webkit-details-marker]:hidden">
                     <summary className="cursor-pointer hover:text-accent">
@@ -164,8 +149,12 @@ export function ModelCard({
                       예시
                     </summary>
                     <div className="mt-1 pl-3 leading-relaxed">
-                      {r.examplesX[0] && <div>X: &ldquo;{r.examplesX[0]}&rdquo;</div>}
-                      {r.examplesY[0] && <div>Y: &ldquo;{r.examplesY[0]}&rdquo;</div>}
+                      {r.examplesX[0] && (
+                        <div>X: &ldquo;{r.examplesX[0]}&rdquo;</div>
+                      )}
+                      {r.examplesY[0] && (
+                        <div>Y: &ldquo;{r.examplesY[0]}&rdquo;</div>
+                      )}
                     </div>
                   </details>
                 )}

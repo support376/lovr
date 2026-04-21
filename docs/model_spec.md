@@ -60,15 +60,22 @@ State 전환 시 현 goal 이 새 state 에 없으면 null 화 → 유저 재선
 
 ## intensity 스케일
 
-규칙의 `intensity`: **-100 ~ +100**
-- `+100` X 하면 상대가 yAxis 방향으로 강하게
-- `0` 무반응
-- `-100` yAxis **반대** 방향 (역효과)
+규칙의 `intensity`: **0 ~ 100** (양수만).
+
+**반대 방향 반응은 음수 쓰지 말고 yAxis 를 반대 축으로 지정**.
+8축은 대립쌍이 있음:
+- proximity_push ↔ proximity_pull
+- emotion_open ↔ emotion_hide
+- commit_push ↔ commit_hold
+- conflict_press ↔ conflict_soothe
 
 예:
-- `pull → push (+75)` 내 거리두기 → 상대 강한 접근 (고전적 당김)
-- `commit_push → commit_hold (+60)` 내 격상 제안 → 상대 회피
-- `conflict_soothe → conflict_soothe (+80)` 사과 → 풀림
+- `pull → push (75)` 내 거리두기 → 상대 접근 (고전적 당김)
+- `commit_push → commit_hold (60)` 내 격상 제안 → 상대 현상유지 (회피)
+- `conflict_press → conflict_soothe (40)` 내 갈등 표출 → 상대 완화
+
+강도:
+- 0~30 약함 · 40~60 중간 · 70~100 강함
 
 ## baseline
 

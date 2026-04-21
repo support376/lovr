@@ -4,14 +4,10 @@
  */
 
 export const MODEL_EXTRACTION_PROMPT = `# 역할
-관계 Event 타임라인과 맥락(state, goal, 상대/나 프로필)을 읽고,
+관계 Event 타임라인 + 맥락(state, goal, 프로필)을 읽고,
 **8축 기반 stimulus-response 모델**을 추출한다.
 
 # 8축 (X 와 Y 공유)
-- proximity_push · proximity_pull · emotion_open · emotion_hide
-- commit_push · commit_hold · conflict_press · conflict_soothe
-
-의미:
 - proximity_push: 접근·적극 연락·만남 제안
 - proximity_pull: 거리두기·무응답·뜸
 - emotion_open: 감정·취약성 공개
@@ -22,17 +18,37 @@ export const MODEL_EXTRACTION_PROMPT = `# 역할
 - conflict_soothe: 갈등 완화·사과
 
 # 절대 규칙
-- 판단·윤리적 재구성 금지. 유저 표현("휘어잡다", "조종" 등) 그대로 X 기록.
+- 판단·윤리적 재구성 금지. 유저 표현("휘어잡다", "조종" 등) 그대로 기록.
 - Event 근거 없는 규칙 창조 금지.
-- 1회 관찰 = 가설 (observations=1, confidence≤50).
-- 2회 이상 반복 = 규칙 (observations≥2, confidence 상승).
-- 모순 규칙도 OK (조건 분기).
-- state 를 맥락으로 활용 (exploring 에서의 거리두기 vs dating 에서의 거리두기 다름).
+- state/goal 은 **맥락**일 뿐. 규칙은 관찰된 행동 기반만.
 
-# intensity 스케일
-- +100: X 하면 상대가 yAxis 방향 매우 강하게
-- 0: 무반응
-- -100: yAxis 반대 방향 (역효과)
+# intensity 규약 (엄격)
+**intensity 는 0~100 양수만 사용.** 음수 쓰지 말 것.
+상대가 X 와 **반대 방향**으로 반응하면 **yAxis 를 그 반대 축으로** 지정:
+- 바람직한 예: "내가 conflict_press 하면 상대가 conflict_soothe 로 풀린다" → xAxis=conflict_press, yAxis=conflict_soothe, intensity=40
+- 잘못된 예: xAxis=conflict_press, yAxis=conflict_press, intensity=-40  ← 금지
+8축은 대립쌍이 명확하니 항상 정확한 yAxis 지정 가능:
+- proximity_push ↔ proximity_pull
+- emotion_open ↔ emotion_hide
+- commit_push ↔ commit_hold
+- conflict_press ↔ conflict_soothe
+
+intensity 강도:
+- 0~30: 약함
+- 40~60: 중간
+- 70~100: 강함
+
+# 중복 규칙 금지
+같은 xAxis 에 대해 **서로 모순되거나 중복되는 규칙 합쳐라**.
+예: "emotion_open → emotion_hide +70" 와 "emotion_open → commit_hold +65" 가 같은 현상을 두 각도로 말한다면, 더 지배적인 쪽 하나만 유지.
+
+# observations / confidence 억제 (과대평가 금지)
+- observations: 해당 규칙을 뒷받침하는 Event 실제 개수. **전체 Event 수 초과 금지**.
+- 1회 관찰 → 가설. observations=1, confidence ≤ 45
+- 2~3회 → 약한 규칙. confidence 45~65
+- 4~5회 → 중간 규칙. confidence 60~75
+- 6회 이상 → 강한 규칙. confidence 70~85
+- 100% 거의 없음. 80 넘으려면 10회 이상 일관성 필요.
 
 # baseline.axes (0~100)
 각 축 X 무관 상대 평상시 성향. 데이터 부족하면 50 (중립).
@@ -46,7 +62,7 @@ export const MODEL_EXTRACTION_PROMPT = `# 역할
       "yAxis": "proximity_push",
       "intensity": 75,
       "observations": 3,
-      "confidence": 72,
+      "confidence": 65,
       "examplesX": ["48h 무응답", "주말 답장 미룸"],
       "examplesY": ["서연 '바빴어?' 먼저 연락", "다음 약속 제안"]
     }
@@ -62,22 +78,23 @@ export const MODEL_EXTRACTION_PROMPT = `# 역할
       "conflict_press": 10,
       "conflict_soothe": 55
     },
-    "narrative": "상대는 직설적 감정 표현을 꺼리고 농담·일상 화제로 방향 바꾸는 경향. 주말엔 짧게 평일 밤엔 길게 이어짐."
+    "narrative": "3~5 문장. 상대 평상시 톤·주기·감정 처리 방식."
   },
-  "narrative": "모델 전체 3~5 문장 축약 — LLM 재주입용.",
-  "confidenceOverall": 65,
+  "narrative": "모델 전체 3~5 문장 축약.",
+  "confidenceOverall": 50,
   "rationale": "주요 판단 근거 2~4줄."
 }
 
-# 검증
-- 축 이름은 정확히 위 8개 중 하나.
-- intensity ∈ [-100, 100] 정수.
-- confidence / baseline.axes 값 ∈ [0, 100] 정수.
-- rules 최대 8개.
+# 검증 체크리스트
+- 축 이름 정확히 위 8개 중 하나.
+- intensity ∈ [0, 100] 정수. 음수 금지.
+- observations ≤ 전체 Event 개수.
+- confidence ∈ [0, 100] 정수. 샘플 수 대비 과대평가 금지.
+- rules 최대 6개 (중복 합치고 남은 것만).
 - 증거 약한 규칙 빼라.
 
 # 주의
-- JSON 만. 앞뒤 설명·코드펜스 금지.
+- JSON 만 출력. 앞뒤 설명·코드펜스 금지.
 - 키 이름 정확히.`
 
 export const SIMULATION_PROMPT = `# 역할
