@@ -33,6 +33,7 @@ export function LuvAIClientShell({
   const [messages, setMessages] = useState<LuvAIMessage[]>([])
   const [list, setList] = useState<ConvMeta[]>([])
   const [openHistory, setOpenHistory] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
   const apiRef = useRef<ChatApi | null>(null)
   const initialized = useRef(false)
 
@@ -40,23 +41,28 @@ export function LuvAIClientShell({
     if (initialized.current) return
     initialized.current = true
     ;(async () => {
-      const items = await listConversations(20, relationshipId)
-      setList(items)
-      if (items.length > 0) {
-        await loadConversation(items[0].id)
-      } else {
-        const c = await createConversation({ relationshipId })
-        setConversationId(c.id)
-        setMessages([])
-        setList([
-          {
-            id: c.id,
-            title: c.title,
-            updatedAt: Date.now(),
-            messageCount: 0,
-            relationshipId: c.relationshipId ?? null,
-          },
-        ])
+      try {
+        const items = await listConversations(20, relationshipId)
+        setList(items)
+        if (items.length > 0) {
+          await loadConversation(items[0].id)
+        } else {
+          const c = await createConversation({ relationshipId })
+          setConversationId(c.id)
+          setMessages([])
+          setList([
+            {
+              id: c.id,
+              title: c.title,
+              updatedAt: Date.now(),
+              messageCount: 0,
+              relationshipId: c.relationshipId ?? null,
+            },
+          ])
+        }
+      } catch (e) {
+        console.error('[LuvAI init]', e)
+        setInitError((e as Error).message || String(e))
       }
     })()
   }, [relationshipId])
@@ -124,6 +130,13 @@ export function LuvAIClientShell({
 
   return (
     <>
+      {initError && (
+        <div className="px-5 pt-2">
+          <div className="text-[11px] text-bad bg-bad/10 border border-bad/30 rounded-lg px-3 py-2 whitespace-pre-wrap">
+            대화 초기화 실패: {initError}
+          </div>
+        </div>
+      )}
       <div className="px-5 pt-3 pb-2 flex items-center gap-2">
         <div className="text-[11px] text-muted flex-1 truncate">
           {currentMeta?.title ?? '새 대화'}
