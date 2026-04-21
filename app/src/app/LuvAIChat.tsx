@@ -1,13 +1,15 @@
 'use client'
 
 import { useRef, useEffect, useState, useTransition } from 'react'
-import { Send, RotateCcw, Save, ChevronDown, Trash2 } from 'lucide-react'
+import { Send, RotateCcw, Save, ChevronDown, Trash2, Lock } from 'lucide-react'
 import { askLuvAI, type LuvAIMessage } from '@/lib/actions/luvai'
 import {
   archiveChat,
   deleteConversation,
   getConversation,
 } from '@/lib/actions/conversations'
+import { usePlan } from '@/lib/plan'
+import { UpgradeGate } from '@/components/UpgradeGate'
 
 type Archive = {
   id: string
@@ -47,6 +49,8 @@ export function LuvAIChat({
   const [analysisBanner, setAnalysisBanner] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sessionStartModelAtRef = useRef<number | null>(modelUpdatedAt)
+  const plan = usePlan()
+  const saveRequiresPaid = archives.length >= 3 && plan === 'free'
 
   useEffect(() => {
     if (
@@ -248,15 +252,28 @@ export function LuvAIChat({
         <div className="shrink-0 flex gap-1.5 items-end">
           {messages.length > 0 && (
             <>
-              <button
-                onClick={save}
-                disabled={pending}
-                className="shrink-0 w-9 h-9 rounded-xl bg-surface-2 border border-border text-muted hover:text-accent flex items-center justify-center disabled:opacity-40"
-                aria-label="저장"
-                title="대화 저장"
-              >
-                <Save size={14} />
-              </button>
+              {saveRequiresPaid ? (
+                <UpgradeGate feature="unlimited_archive" onProceed={save}>
+                  <button
+                    disabled={pending}
+                    className="shrink-0 w-9 h-9 rounded-xl bg-surface-2 border border-accent/40 text-accent flex items-center justify-center disabled:opacity-40"
+                    aria-label="저장 (프리미엄)"
+                    title="아카이브 3개 초과 — 프리미엄"
+                  >
+                    <Lock size={12} />
+                  </button>
+                </UpgradeGate>
+              ) : (
+                <button
+                  onClick={save}
+                  disabled={pending}
+                  className="shrink-0 w-9 h-9 rounded-xl bg-surface-2 border border-border text-muted hover:text-accent flex items-center justify-center disabled:opacity-40"
+                  aria-label="저장"
+                  title="대화 저장"
+                >
+                  <Save size={14} />
+                </button>
+              )}
               <button
                 onClick={reset}
                 disabled={pending}

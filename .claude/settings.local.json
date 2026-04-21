@@ -38,7 +38,12 @@
       "Bash(git reset *)",
       "Bash(npx next *)",
       "Bash(vercel alias *)",
-      "Bash(vercel logs *)"
+      "Bash(vercel logs *)",
+      "Bash(xargs grep *)",
+      "Bash(xargs wc *)",
+      "Bash(xargs cat *)",
+      "Bash(rm -f src/app/now/page.tsx src/app/targets/page.tsx src/app/t/\\\\[id\\\\]/page.tsx src/app/r/me/page.tsx)",
+      "Bash(rmdir src/app/now src/app/targets src/app/t/\\\\[id\\\\] src/app/t src/app/r/me)"
     ]
   }
 }

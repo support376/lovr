@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Check } from 'lucide-react'
+import { Plus, Check, Lock } from 'lucide-react'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import {
   updatePartner,
@@ -19,6 +19,8 @@ import {
   type RelationshipGoal,
   type RelationshipState,
 } from '@/lib/db/schema'
+import { usePlan } from '@/lib/plan'
+import { UpgradeGate } from '@/components/UpgradeGate'
 
 const GENDER = [
   { v: '', l: '-' },
@@ -58,6 +60,9 @@ export function PartnerSettings({
 }) {
   const router = useRouter()
   const [pendingSelect, startSelect] = useTransition()
+  const plan = usePlan()
+
+  const requiresPaid = all.length >= 1 && plan === 'free'
 
   const pick = (id: string) => {
     if (id === current?.id) return
@@ -66,6 +71,8 @@ export function PartnerSettings({
       router.refresh()
     })
   }
+
+  const goNew = () => router.push('/r/new')
 
   return (
     <div className="flex flex-col gap-3">
@@ -93,12 +100,23 @@ export function PartnerSettings({
             </button>
           )
         })}
-        <Link
-          href="/r/new"
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border border-dashed border-border text-muted hover:text-accent hover:border-accent"
-        >
-          <Plus size={11} /> 추가
-        </Link>
+        {requiresPaid ? (
+          <UpgradeGate feature="multi_partner" onProceed={goNew}>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border border-dashed border-accent/40 text-accent hover:border-accent"
+            >
+              <Lock size={10} /> 추가 (프리미엄)
+            </button>
+          </UpgradeGate>
+        ) : (
+          <Link
+            href="/r/new"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border border-dashed border-border text-muted hover:text-accent hover:border-accent"
+          >
+            <Plus size={11} /> 추가
+          </Link>
+        )}
       </div>
 
       {!current ? (
