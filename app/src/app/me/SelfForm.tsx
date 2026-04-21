@@ -13,17 +13,14 @@ const GENDER = [
 ]
 
 /**
- * MY 프로필 — 명목 fact 전용.
- * 자가진단 · 요약 · 딜브레이커 · 강점/약점 전부 제거.
- * 분석은 '분석' 탭에서 Event 기반 모델이 담당.
+ * MY 프로필 — 명목 fact 만. 자가진단·자산·지출 없음.
  */
 export function SelfForm({ initial }: { initial: Actor }) {
   const [name, setName] = useState(initial.displayName)
   const [age, setAge] = useState(initial.age?.toString() ?? '')
   const [gender, setGender] = useState(initial.gender ?? '')
   const [occupation, setOccupation] = useState(initial.occupation ?? '')
-  const [assets, setAssets] = useState(initial.assetsNotes ?? '')
-  const [spending, setSpending] = useState(initial.spendingNotes ?? '')
+  const [rawNotes, setRawNotes] = useState(initial.rawNotes ?? '')
 
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
@@ -38,8 +35,7 @@ export function SelfForm({ initial }: { initial: Actor }) {
           age: age ? parseInt(age, 10) : null,
           gender: gender || null,
           occupation: occupation.trim() || null,
-          assetsNotes: assets.trim() || null,
-          spendingNotes: spending.trim() || null,
+          rawNotes: rawNotes.trim() || null,
         })
         setMsg('저장됨')
         router.refresh()
@@ -99,30 +95,14 @@ export function SelfForm({ initial }: { initial: Actor }) {
       </Card>
 
       <Card>
-        <div className="text-xs text-muted uppercase tracking-wider mb-2">재산 / 자산</div>
-        <div className="text-[11px] text-muted mb-2 leading-relaxed">
-          연봉대·부동산·저축·현재 자산. fact 위주. 자유 서술.
-        </div>
-        <TextArea
-          value={assets}
-          onChange={(e) => setAssets(e.target.value)}
-          rows={5}
-          placeholder={`예시:\n- 연봉 6000만원\n- 월세 85만원 거주\n- 저축 2천만원\n- 차 없음`}
-        />
-      </Card>
-
-      <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">
-          지출 · 쓰는 것
-        </div>
-        <div className="text-[11px] text-muted mb-2 leading-relaxed">
-          평소 어디에 돈 쓰는지. 브랜드·취미·월 지출 구조.
+          자유 메모 (선택)
         </div>
         <TextArea
-          value={spending}
-          onChange={(e) => setSpending(e.target.value)}
+          value={rawNotes}
+          onChange={(e) => setRawNotes(e.target.value)}
           rows={5}
-          placeholder={`예시:\n- 카페 월 30만원, 식비 월 60만원\n- 옷: 무신사 자주\n- 취미: 클라이밍 월 15만원\n- 소비 유형: 계획형, 반반 적금`}
+          placeholder="필요한 맥락만 짧게. 모델은 기록(Event)으로부터 학습함."
         />
       </Card>
 

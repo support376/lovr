@@ -8,7 +8,7 @@ import {
 import { requireUserId } from '../supabase/server'
 
 export type ModelActionResult =
-  | { ok: true; confidence: number; rulesCount: number; evidenceCount: number }
+  | { ok: true; confidence: number; rulesCount: number; evidenceCount: number; version: number }
   | { ok: false; error: string }
 
 export async function extractModelAction(
@@ -23,9 +23,10 @@ export async function extractModelAction(
     revalidatePath(`/r/${relationshipId}`)
     return {
       ok: true,
-      confidence: model.confidence,
+      confidence: model.confidenceOverall,
       rulesCount: model.rules.length,
       evidenceCount,
+      version: model.version,
     }
   } catch (e) {
     console.error('[extractModelAction]', e)

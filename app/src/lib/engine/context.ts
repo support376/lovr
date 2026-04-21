@@ -5,14 +5,16 @@ import {
   actors,
   events,
   relationships,
+  STATE_LABEL,
+  GOAL_LABEL,
   type Actor,
   type Event,
   type Relationship,
+  type RelationshipState,
+  type RelationshipGoal,
 } from '../db/schema'
+import { formatModel } from './model'
 
-/**
- * LLM 컨텍스트 조립. Y = aX + b 모델 중심.
- */
 export type RenderedContext = {
   markdown: string
   self: Actor | null
@@ -24,7 +26,7 @@ export type RenderedContext = {
 export async function buildContext(
   userId: string,
   relationshipId: string,
-  eventLimit = 30
+  eventLimit = 20
 ): Promise<RenderedContext> {
   const [self] = await db
     .select()
@@ -60,7 +62,7 @@ export async function buildContext(
     .orderBy(desc(events.createdAt))
     .limit(eventLimit)
 
-  const md = renderMarkdown({
+  const md = render({
     self: self ?? null,
     partner: partner ?? null,
     relationship: rel ?? null,
@@ -76,7 +78,7 @@ export async function buildContext(
   }
 }
 
-function renderMarkdown(c: {
+function render(c: {
   self: Actor | null
   partner: Actor | null
   relationship: Relationship | null
@@ -88,37 +90,47 @@ function renderMarkdown(c: {
   if (c.self) {
     lines.push(`- 이름: ${c.self.displayName}`)
     if (c.self.age) lines.push(`- 나이: ${c.self.age}`)
+    if (c.self.gender) lines.push(`- 성별: ${c.self.gender}`)
     if (c.self.occupation) lines.push(`- 직업: ${c.self.occupation}`)
-    if (c.self.rawNotes) lines.push(`- 메모: ${c.self.rawNotes.slice(0, 300)}`)
+    if (c.self.rawNotes) lines.push(`- 메모: ${c.self.rawNotes.slice(0, 400)}`)
   }
 
   lines.push('\n## [Partner]')
   if (c.partner) {
     lines.push(`- 이름: ${c.partner.displayName}`)
     if (c.partner.age) lines.push(`- 나이: ${c.partner.age}`)
+    if (c.partner.gender) lines.push(`- 성별: ${c.partner.gender}`)
     if (c.partner.occupation) lines.push(`- 직업: ${c.partner.occupation}`)
     if ((c.partner.knownConstraints ?? []).length > 0)
       lines.push(`- 제약: ${c.partner.knownConstraints!.join(', ')}`)
     if (c.partner.rawNotes)
-      lines.push(`- 메모: ${c.partner.rawNotes.slice(0, 300)}`)
+      lines.push(`- 메모: ${c.partner.rawNotes.slice(0, 500)}`)
   }
 
-  if (c.relationship?.description) {
-    lines.push(`\n## [관계 정의]\n${c.relationship.description}`)
-  }
+  if (c.relationship) {
+    const rel = c.relationship
+    lines.push('\n## [관계 맥락]')
+    lines.push(
+      `- state: ${rel.state} (${STATE_LABEL[rel.state as RelationshipState] ?? rel.state})`
+    )
+    if (rel.goal) {
+      lines.push(
+        `- goal: ${rel.goal} (${GOAL_LABEL[rel.goal as RelationshipGoal] ?? rel.goal})`
+      )
+    }
+    if (rel.description) lines.push(`- 관계: ${rel.description}`)
+    if (rel.timelineStart)
+      lines.push(`- 첫 만남: ${new Date(rel.timelineStart).toISOString().slice(0, 10)}`)
+    if (rel.timelineEnd)
+      lines.push(`- 종료: ${new Date(rel.timelineEnd).toISOString().slice(0, 10)}`)
 
-  if (c.relationship?.model) {
-    const m = c.relationship.model
-    lines.push('\n## [현재 모델 — Y = aX + b]')
-    lines.push(`- 신뢰도 ${m.confidence}% · 증거 ${m.evidenceCount}개`)
-    if (m.baseline) lines.push(`\n### b · baseline\n${m.baseline}`)
-    if (m.rules.length > 0) {
-      lines.push('\n### a · 규칙 (X→Y)')
-      for (const r of m.rules) {
-        lines.push(
-          `- 내가 "${r.x}" → "${r.y}" (관찰 ${r.observations}회, 신뢰 ${r.confidence}%)`
-        )
-      }
+    if (rel.model && rel.model.rules && rel.model.rules.length > 0) {
+      lines.push('\n' + formatModel(
+        rel.model,
+        c.partner?.displayName ?? '상대',
+        rel.state as RelationshipState,
+        (rel.goal as RelationshipGoal | null) ?? null
+      ))
     }
   }
 
@@ -128,9 +140,7 @@ function renderMarkdown(c: {
   } else {
     for (const e of c.events) {
       const ts = e.timestamp
-        ? new Date(
-            e.timestamp instanceof Date ? e.timestamp : Number(e.timestamp)
-          ).toISOString()
+        ? new Date(e.timestamp).toISOString()
         : '날짜 불명'
       lines.push(`\n### [${e.type}] ${ts}`)
       lines.push(e.content)

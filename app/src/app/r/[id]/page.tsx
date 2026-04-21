@@ -1,27 +1,18 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
-import { getRelationship, listRelationships } from '@/lib/actions/relationships'
+import {
+  getRelationship,
+  listRelationships,
+} from '@/lib/actions/relationships'
+import {
+  STATE_LABEL,
+  type RelationshipGoal,
+  type RelationshipState,
+} from '@/lib/db/schema'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { ModelCard } from './ModelCard'
+import { StateGoalEditor } from './StateGoalEditor'
 import { TargetSwitcher } from '@/components/TargetSwitcher'
-
-const PROGRESS_KO: Record<string, string> = {
-  unknown: '판단 불가',
-  observing: '관찰 중',
-  approaching: '다가가는 중',
-  exploring: '서로 탐색',
-  exclusive: '독점 직전',
-  committed: '공식 연인',
-  decayed: '식어감',
-  ended: '종료',
-  pre_match: '매칭 전',
-  first_contact: '첫 접촉',
-  sseom: '썸',
-  dating_early: '연애 초기',
-  dating_stable: '연애 안정',
-  conflict: '갈등',
-  reconnection: '재연결',
-}
 
 export default async function RelationshipAnalysisPage({
   params,
@@ -37,6 +28,9 @@ export default async function RelationshipAnalysisPage({
 
   const all = await listRelationships()
 
+  const state = (rel.state as RelationshipState) ?? 'exploring'
+  const goal = (rel.goal as RelationshipGoal | null) ?? null
+
   return (
     <>
       <div className="pt-3 pb-1">
@@ -47,7 +41,7 @@ export default async function RelationshipAnalysisPage({
         />
       </div>
 
-      <header className="px-5 pt-3 pb-3">
+      <header className="px-5 pt-3 pb-2">
         <h1 className="text-2xl font-bold truncate">
           {rel.partner.displayName}
           {rel.partner.age ? (
@@ -58,7 +52,7 @@ export default async function RelationshipAnalysisPage({
         </h1>
         <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
           <span className="px-2 py-0.5 rounded-full bg-accent/20 text-accent font-medium">
-            {PROGRESS_KO[rel.progress] ?? rel.progress}
+            {STATE_LABEL[state]}
           </span>
           {rel.partner.occupation && (
             <span className="px-1.5 py-0.5 rounded bg-surface-2 text-muted">
@@ -74,14 +68,23 @@ export default async function RelationshipAnalysisPage({
       </header>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {/* Y = aX + b 모델 카드 — 이 화면의 메인 */}
+        {/* 상태 + 목적 편집 */}
+        <section>
+          <StateGoalEditor
+            relationshipId={id}
+            state={state}
+            goal={goal}
+          />
+        </section>
+
+        {/* Y = aX + b 모델 카드 */}
         <ModelCard
           relationshipId={id}
           model={rel.model}
           partnerName={rel.partner.displayName}
         />
 
-        {/* 상대 프로필 — 직접 입력 */}
+        {/* 상대 프로필 */}
         <section>
           <div className="text-xs text-muted uppercase tracking-wider mb-2">
             {rel.partner.displayName} 프로필 (fact)

@@ -1,18 +1,15 @@
 -- ============================================================================
 -- LuvOS · Supabase Postgres 초기 설정 (fresh install)
---
--- 기존 배포 DB 는 docs/migration_v2_model.sql 로 in-place 마이그레이션.
+-- 기존 배포는 docs/migration_v3_axes.sql (그리고 이전 v2 도 순서대로) 로.
 --
 -- 사용법:
---   1. Supabase 프로젝트 > SQL Editor > "New query"
---   2. 이 파일 전체 복사 → 붙여넣기 → Run
+--   1. Supabase > SQL Editor > New query
+--   2. 이 파일 전체 → Run
 --   3. Vercel env:
 --        NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
---        SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL, ANTHROPIC_API_KEY
---   4. Authentication > Providers > Google 활성화 + redirect URLs:
---        https://<your-vercel-domain>/auth/callback
---        http://localhost:3000/auth/callback
---   5. Storage > New bucket: "screenshots" (public 또는 private + policy)
+--        DATABASE_URL (Session pooler), ANTHROPIC_API_KEY
+--   4. Authentication > Providers > Google 활성화 + redirect URLs
+--   5. Storage > New bucket "screenshots" (Phase B)
 -- ============================================================================
 
 drop table if exists insights cascade;
@@ -31,15 +28,13 @@ create table actors (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
-  role text not null,
+  role text not null,                   -- 'self' | 'partner'
   display_name text not null,
   raw_notes text,
   known_constraints jsonb not null default '[]'::jsonb,
   age integer,
   gender text,
-  occupation text,
-  assets_notes text,
-  spending_notes text
+  occupation text
 );
 create index on actors(user_id);
 create index on actors(user_id, role);
@@ -53,10 +48,12 @@ create table relationships (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   partner_id text not null references actors(id) on delete cascade,
-  progress text not null default 'observing',
+  state text not null default 'exploring',
+  goal text,
   description text,
   model jsonb,
   timeline_start timestamptz,
+  timeline_end timestamptz,
   status text not null default 'active'
 );
 create index on relationships(user_id);
@@ -71,7 +68,7 @@ create table events (
   created_at timestamptz not null default now(),
   timestamp timestamptz,
   relationship_id text not null references relationships(id) on delete cascade,
-  type text not null,
+  type text not null,                   -- 'chat' | 'event' | 'note'
   content text not null,
   attachments jsonb not null default '[]'::jsonb,
   context_tags jsonb not null default '[]'::jsonb
@@ -147,7 +144,6 @@ alter table outcomes enable row level security;
 alter table insights enable row level security;
 alter table conversations enable row level security;
 
--- user_id 매칭만 허용 (auth.uid() = user_id)
 do $$ declare t text; begin
   for t in select unnest(array['actors','relationships','events','actions','outcomes','insights','conversations'])
   loop

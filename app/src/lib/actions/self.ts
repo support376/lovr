@@ -33,8 +33,6 @@ export type SelfInput = {
   age?: number | null
   gender?: string | null
   occupation?: string | null
-  assetsNotes?: string | null
-  spendingNotes?: string | null
 }
 
 export async function createSelf(
@@ -56,8 +54,6 @@ export async function createSelf(
       age: input.age ?? null,
       gender: input.gender ?? null,
       occupation: input.occupation ?? null,
-      assetsNotes: input.assetsNotes ?? null,
-      spendingNotes: input.spendingNotes ?? null,
     })
     .returning()
 
@@ -72,8 +68,6 @@ const ALLOWED_FIELDS = [
   'age',
   'gender',
   'occupation',
-  'assetsNotes',
-  'spendingNotes',
 ] as const
 
 export async function updateSelf(input: SelfInput): Promise<Actor> {

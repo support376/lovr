@@ -20,23 +20,7 @@ export type SwitcherRoute =
   | { kind: 'query'; base: string; param: string }
   | { kind: 'refresh' }
 
-const STAGE_KO: Record<string, string> = {
-  unknown: '판단 불가',
-  observing: '관찰 중',
-  approaching: '다가가는 중',
-  exploring: '서로 탐색',
-  exclusive: '독점 직전',
-  committed: '공식 연인',
-  decayed: '식어감',
-  ended: '종료',
-  pre_match: '매칭 전',
-  first_contact: '첫 접촉',
-  sseom: '썸',
-  dating_early: '연애 초기',
-  dating_stable: '연애 안정',
-  conflict: '갈등',
-  reconnection: '재연결',
-}
+import { STATE_LABEL, type RelationshipState } from '@/lib/db/schema'
 
 export function TargetSwitcher({
   relationships,
@@ -71,7 +55,8 @@ export function TargetSwitcher({
       <div className="flex gap-2 pb-1">
         {relationships.map((r) => {
           const active = r.id === currentId
-          const stageKo = STAGE_KO[r.progress] ?? r.progress
+          const stageKo =
+            STATE_LABEL[r.state as RelationshipState] ?? r.state
           const lastTs =
             r.updatedAt instanceof Date
               ? r.updatedAt.getTime()

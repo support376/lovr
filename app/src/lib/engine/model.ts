@@ -5,10 +5,17 @@ import {
   actors,
   events,
   relationships,
+  AXES,
+  GOAL_LABEL,
+  STATE_LABEL,
+  type Axis,
   type Event,
   type Relationship,
+  type RelationshipBaseline,
   type RelationshipModel,
   type RelationshipRule,
+  type RelationshipState,
+  type RelationshipGoal,
 } from '../db/schema'
 import { anthropic, DEEP_MODEL, MID_MODEL } from '../ai/client'
 import {
@@ -16,29 +23,111 @@ import {
   SIMULATION_PROMPT,
 } from '../prompts/model'
 
+// =============================================================================
+// Model extraction
+// =============================================================================
+
 type RawRule = {
-  x?: string
-  y?: string
+  xAxis?: string
+  yAxis?: string
+  intensity?: number | string
   observations?: number | string
   confidence?: number | string
+  examplesX?: unknown
+  examplesY?: unknown
+}
+
+type RawBaseline = {
+  axes?: Partial<Record<string, number | string>>
+  narrative?: string
 }
 
 type RawModel = {
   rules?: RawRule[]
-  baseline?: string
-  confidence?: number | string
-  evidenceCount?: number | string
+  baseline?: RawBaseline
+  narrative?: string
+  confidenceOverall?: number | string
   rationale?: string
 }
 
-/**
- * Event 원자료 → Y = aX + b 모델 추출. 결과를 relationships.model 에 저장.
- */
+function isAxis(v: unknown): v is Axis {
+  return typeof v === 'string' && (AXES as readonly string[]).includes(v)
+}
+
+function clampInt(
+  v: number | string | undefined,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const n =
+    typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, Math.round(n)))
+}
+
+function defaultBaseline(): RelationshipBaseline {
+  return {
+    axes: {
+      proximity_push: 50,
+      proximity_pull: 50,
+      emotion_open: 50,
+      emotion_hide: 50,
+      commit_push: 50,
+      commit_hold: 50,
+      conflict_press: 50,
+      conflict_soothe: 50,
+    },
+    narrative: '',
+  }
+}
+
+function parseBaseline(raw: RawBaseline | undefined): RelationshipBaseline {
+  const base = defaultBaseline()
+  if (!raw) return base
+  if (raw.axes && typeof raw.axes === 'object') {
+    for (const ax of AXES) {
+      const v = (raw.axes as Record<string, number | string | undefined>)[ax]
+      base.axes[ax] = clampInt(v, 50, 0, 100)
+    }
+  }
+  base.narrative = typeof raw.narrative === 'string' ? raw.narrative.trim() : ''
+  return base
+}
+
+function parseRules(
+  raw: RawRule[] | undefined,
+  evidenceIds: string[],
+  at: number
+): RelationshipRule[] {
+  if (!Array.isArray(raw)) return []
+  const rules: RelationshipRule[] = []
+  for (const r of raw) {
+    if (!isAxis(r.xAxis) || !isAxis(r.yAxis)) continue
+    rules.push({
+      xAxis: r.xAxis,
+      yAxis: r.yAxis,
+      intensity: clampInt(r.intensity, 0, -100, 100),
+      observations: clampInt(r.observations, 1, 1, 1000),
+      confidence: clampInt(r.confidence, 50, 0, 100),
+      examplesX: Array.isArray(r.examplesX)
+        ? r.examplesX.filter((s): s is string => typeof s === 'string').slice(0, 3)
+        : [],
+      examplesY: Array.isArray(r.examplesY)
+        ? r.examplesY.filter((s): s is string => typeof s === 'string').slice(0, 3)
+        : [],
+      evidenceEventIds: evidenceIds,
+      lastUpdated: at,
+    })
+    if (rules.length >= 8) break
+  }
+  return rules
+}
+
 export async function extractRelationshipModel(
   userId: string,
   relationshipId: string
 ): Promise<{ model: RelationshipModel; evidenceCount: number }> {
-  // 1. load context
   const [rel] = await db
     .select()
     .from(relationships)
@@ -56,7 +145,6 @@ export async function extractRelationshipModel(
     .from(actors)
     .where(and(eq(actors.id, rel.partnerId), eq(actors.userId, userId)))
     .limit(1)
-
   const [self] = await db
     .select()
     .from(actors)
@@ -76,18 +164,17 @@ export async function extractRelationshipModel(
     throw new Error('Event 없음 — 기록 먼저 추가해주세요.')
   }
 
-  // 2. prompt
-  const userMsg = renderMarkdown({
+  const userMsg = renderExtractionContext({
     self: self ?? null,
     partner: partner ?? null,
     relationship: rel,
-    events: evList.reverse(), // 오래된 → 최신
+    events: [...evList].reverse(),
   })
 
   const client = anthropic()
   const res = await client.messages.create({
     model: MID_MODEL,
-    max_tokens: 2000,
+    max_tokens: 2500,
     system: [
       {
         type: 'text',
@@ -104,7 +191,6 @@ export async function extractRelationshipModel(
     .join('')
     .trim()
 
-  // 3. parse
   let parsed: RawModel = {}
   try {
     parsed = JSON.parse(extractJson(text)) as RawModel
@@ -115,31 +201,25 @@ export async function extractRelationshipModel(
   }
 
   const now = Date.now()
-  const rules: RelationshipRule[] = (parsed.rules ?? [])
-    .filter(
-      (r) =>
-        r && typeof r.x === 'string' && r.x.trim() &&
-        typeof r.y === 'string' && r.y.trim()
-    )
-    .slice(0, 8)
-    .map((r) => ({
-      x: r.x!.trim(),
-      y: r.y!.trim(),
-      observations: clampInt(r.observations, 1, 1, 100),
-      confidence: clampInt(r.confidence, 50, 0, 100),
-      evidenceEventIds: evList.map((e) => e.id),
-      lastUpdated: now,
-    }))
+  const evidenceIds = evList.map((e) => e.id)
+  const rules = parseRules(parsed.rules, evidenceIds, now)
+  const baseline = parseBaseline(parsed.baseline)
+  const confidenceOverall = clampInt(parsed.confidenceOverall, 50, 0, 100)
+
+  const previousVersion = rel.model?.version ?? 0
 
   const model: RelationshipModel = {
     rules,
-    baseline: (parsed.baseline ?? '').trim(),
-    confidence: clampInt(parsed.confidence, 50, 0, 100),
+    baseline,
+    lastEventIds: evidenceIds,
+    version: previousVersion + 1,
+    evidenceCount: evList.length,
+    confidenceOverall,
     updatedAt: now,
-    evidenceCount: clampInt(parsed.evidenceCount, evList.length, 0, 100000),
+    narrative:
+      typeof parsed.narrative === 'string' ? parsed.narrative.trim() : '',
   }
 
-  // 4. save
   await db
     .update(relationships)
     .set({ model, updatedAt: new Date() })
@@ -153,9 +233,10 @@ export async function extractRelationshipModel(
   return { model, evidenceCount: evList.length }
 }
 
-/**
- * 현재 모델 + 제안 X → 예상 Y 시뮬레이션.
- */
+// =============================================================================
+// Simulation
+// =============================================================================
+
 export async function simulateResponse(
   userId: string,
   relationshipId: string,
@@ -173,7 +254,7 @@ export async function simulateResponse(
     .limit(1)
   if (!rel) throw new Error('Relationship not found')
   if (!rel.model || !rel.model.rules || rel.model.rules.length === 0) {
-    throw new Error('아직 모델 없음. 분석 탭에서 재분석 먼저 돌려줘.')
+    throw new Error('아직 모델 없음. 분석 탭에서 "모델 추출" 먼저 돌려줘.')
   }
 
   const [partner] = await db
@@ -182,15 +263,19 @@ export async function simulateResponse(
     .where(and(eq(actors.id, rel.partnerId), eq(actors.userId, userId)))
     .limit(1)
 
-  const modelBlock = formatModel(rel.model, partner?.displayName ?? '상대')
+  const modelBlock = formatModel(
+    rel.model,
+    partner?.displayName ?? '상대',
+    rel.state as RelationshipState,
+    rel.goal as RelationshipGoal | null
+  )
 
   const userMsg = `${modelBlock}
 
-## [제안 X — 내가 할 행동]
+## [제안 X / 유저 질의]
 ${proposedX.trim()}`
 
   const client = anthropic()
-  // Simulation 은 지시 따르기·거부 override 가 중요 — Opus 사용.
   const res = await client.messages.create({
     model: DEEP_MODEL,
     max_tokens: 1500,
@@ -213,55 +298,64 @@ ${proposedX.trim()}`
   return { markdown }
 }
 
-// -------------------------------------------------------
-// Helpers
-// -------------------------------------------------------
+// =============================================================================
+// Context rendering
+// =============================================================================
 
-function renderMarkdown(c: {
+function renderExtractionContext(c: {
   self: typeof actors.$inferSelect | null
   partner: typeof actors.$inferSelect | null
   relationship: Relationship
   events: Event[]
 }): string {
   const lines: string[] = []
+  const rel = c.relationship
 
-  lines.push('## [Self]')
+  lines.push('## [관계 맥락]')
+  lines.push(
+    `- state: ${rel.state} (${STATE_LABEL[rel.state as RelationshipState] ?? rel.state})`
+  )
+  if (rel.goal) {
+    const goalLabel = GOAL_LABEL[rel.goal as RelationshipGoal] ?? rel.goal
+    lines.push(`- goal: ${rel.goal} (${goalLabel})`)
+  }
+  if (rel.description) lines.push(`- description: ${rel.description}`)
+  if (rel.timelineStart)
+    lines.push(`- first_met: ${new Date(rel.timelineStart).toISOString().slice(0, 10)}`)
+  if (rel.timelineEnd)
+    lines.push(`- ended_at: ${new Date(rel.timelineEnd).toISOString().slice(0, 10)}`)
+
+  lines.push('\n## [Self]')
   if (c.self) {
     lines.push(`- 이름: ${c.self.displayName}`)
     if (c.self.age) lines.push(`- 나이: ${c.self.age}`)
+    if (c.self.gender) lines.push(`- 성별: ${c.self.gender}`)
     if (c.self.occupation) lines.push(`- 직업: ${c.self.occupation}`)
-    if (c.self.assetsNotes)
-      lines.push(`- 자산: ${c.self.assetsNotes.slice(0, 200)}`)
-    if (c.self.spendingNotes)
-      lines.push(`- 지출: ${c.self.spendingNotes.slice(0, 200)}`)
+    if (c.self.rawNotes) lines.push(`- 메모: ${c.self.rawNotes.slice(0, 400)}`)
   }
 
   lines.push('\n## [Partner]')
   if (c.partner) {
     lines.push(`- 이름: ${c.partner.displayName}`)
     if (c.partner.age) lines.push(`- 나이: ${c.partner.age}`)
+    if (c.partner.gender) lines.push(`- 성별: ${c.partner.gender}`)
     if (c.partner.occupation) lines.push(`- 직업: ${c.partner.occupation}`)
     if ((c.partner.knownConstraints ?? []).length > 0)
       lines.push(`- 제약: ${c.partner.knownConstraints!.join(', ')}`)
     if (c.partner.rawNotes)
-      lines.push(`- 메모: ${c.partner.rawNotes.slice(0, 300)}`)
+      lines.push(`- 메모: ${c.partner.rawNotes.slice(0, 500)}`)
   }
 
-  if (c.relationship.description) {
-    lines.push(`\n## [관계 정의]\n${c.relationship.description}`)
-  }
-
-  if (c.relationship.model) {
-    lines.push('\n## [현재 모델 — 이전 추론]')
-    lines.push(formatModel(c.relationship.model, c.partner?.displayName ?? '상대'))
+  if (rel.model) {
+    lines.push('\n## [현재 모델 — 이전 추론, 참고용]')
+    lines.push(`- 버전: v${rel.model.version} · 신뢰도 ${rel.model.confidenceOverall}%`)
+    if (rel.model.narrative) lines.push(`- 축약: ${rel.model.narrative}`)
   }
 
   lines.push(`\n## [Events ${c.events.length}개 — 과거→최신]`)
   for (const e of c.events) {
     const ts = e.timestamp
-      ? new Date(
-          e.timestamp instanceof Date ? e.timestamp : Number(e.timestamp)
-        ).toISOString()
+      ? new Date(e.timestamp).toISOString()
       : '날짜 불명'
     lines.push(`\n### [${e.type}] ${ts}`)
     lines.push(e.content)
@@ -270,21 +364,45 @@ function renderMarkdown(c: {
   return lines.join('\n')
 }
 
-function formatModel(m: RelationshipModel, partnerName: string): string {
+export function formatModel(
+  m: RelationshipModel,
+  partnerName: string,
+  state: RelationshipState,
+  goal: RelationshipGoal | null
+): string {
   const lines: string[] = []
-  lines.push(`[모델 신뢰도 ${m.confidence}% · 증거 ${m.evidenceCount}개]`)
-  if (m.rules.length > 0) {
-    lines.push('\n### 규칙 (a — X→Y)')
-    for (const r of m.rules) {
-      lines.push(
-        `- 내가 "${r.x}" → ${partnerName}: "${r.y}" (관찰 ${r.observations}회 · 신뢰 ${r.confidence}%)`
-      )
-    }
+  lines.push(`## [관계 맥락]`)
+  lines.push(`- state: ${state} (${STATE_LABEL[state] ?? state})`)
+  if (goal) {
+    lines.push(`- goal: ${goal} (${GOAL_LABEL[goal] ?? goal})`)
   }
-  if (m.baseline) {
-    lines.push('\n### Baseline (b — X 무관 디폴트)')
-    lines.push(m.baseline)
+  lines.push(`\n## [관계 모델 v${m.version} · 신뢰도 ${m.confidenceOverall}% · 증거 ${m.evidenceCount}]`)
+  lines.push(`대상: ${partnerName}`)
+
+  lines.push('\n### Baseline (X 무관 평상시 성향 · 0~100)')
+  for (const ax of AXES) {
+    lines.push(`- ${ax}: ${m.baseline.axes[ax]}`)
   }
+  if (m.baseline.narrative) {
+    lines.push(`\nbaseline narrative: ${m.baseline.narrative}`)
+  }
+
+  lines.push('\n### Rules (관찰 강한 순)')
+  const sorted = [...m.rules].sort((a, b) => b.confidence - a.confidence)
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i]
+    const sign = r.intensity >= 0 ? '+' : ''
+    lines.push(
+      `${i + 1}. [${r.xAxis} → ${r.yAxis} ${sign}${r.intensity}] 관찰 ${r.observations}회 · 신뢰 ${r.confidence}%`
+    )
+    if (r.examplesX[0]) lines.push(`   ex_X: "${r.examplesX[0]}"`)
+    if (r.examplesY[0]) lines.push(`   ex_Y: "${r.examplesY[0]}"`)
+  }
+
+  if (m.narrative) {
+    lines.push(`\n### 축약\n${m.narrative}`)
+  }
+
   return lines.join('\n')
 }
 
@@ -295,15 +413,4 @@ function extractJson(s: string): string {
   const end = s.lastIndexOf('}')
   if (start >= 0 && end > start) return s.slice(start, end + 1)
   return s
-}
-
-function clampInt(
-  v: number | string | undefined,
-  fallback: number,
-  min: number,
-  max: number
-): number {
-  const n = typeof v === 'number' ? v : typeof v === 'string' ? parseFloat(v) : NaN
-  if (!Number.isFinite(n)) return fallback
-  return Math.max(min, Math.min(max, Math.round(n)))
 }

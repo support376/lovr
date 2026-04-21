@@ -73,7 +73,7 @@ export async function createRelationship(input: {
   partnerName: string
   partnerRawNotes?: string
   partnerKnownConstraints?: string[]
-  progress?: string
+  state?: string
 }): Promise<{ relationshipId: string; partnerId: string }> {
   const uid = await requireUserId()
 
@@ -93,7 +93,7 @@ export async function createRelationship(input: {
     id: relId,
     userId: uid,
     partnerId,
-    progress: input.progress ?? 'observing',
+    state: input.state ?? 'exploring',
     status: 'active',
   })
 
@@ -105,7 +105,15 @@ export async function createRelationship(input: {
 export async function updateRelationship(
   id: string,
   patch: Partial<
-    Pick<Relationship, 'description' | 'progress' | 'status' | 'timelineStart'>
+    Pick<
+      Relationship,
+      | 'description'
+      | 'state'
+      | 'goal'
+      | 'status'
+      | 'timelineStart'
+      | 'timelineEnd'
+    >
   >
 ): Promise<void> {
   const uid = await requireUserId()
