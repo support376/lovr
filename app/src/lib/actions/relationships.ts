@@ -10,6 +10,7 @@ import {
   type Actor,
   type Relationship,
 } from '../db/schema'
+import { cookies } from 'next/headers'
 import { requireUserId } from '../supabase/server'
 import { getFocusRelationshipId } from '../server/focus'
 
@@ -95,6 +96,13 @@ export async function createRelationship(input: {
     partnerId,
     state: input.state ?? 'exploring',
     status: 'active',
+  })
+
+  const store = await cookies()
+  store.set('focusRel', relId, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: 'lax',
   })
 
   revalidatePath('/')
