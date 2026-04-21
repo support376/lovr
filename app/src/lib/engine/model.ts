@@ -10,7 +10,7 @@ import {
   type RelationshipModel,
   type RelationshipRule,
 } from '../db/schema'
-import { anthropic, MID_MODEL } from '../ai/client'
+import { anthropic, DEEP_MODEL, MID_MODEL } from '../ai/client'
 import {
   MODEL_EXTRACTION_PROMPT,
   SIMULATION_PROMPT,
@@ -190,9 +190,10 @@ export async function simulateResponse(
 ${proposedX.trim()}`
 
   const client = anthropic()
+  // Simulation 은 지시 따르기·거부 override 가 중요 — Opus 사용.
   const res = await client.messages.create({
-    model: MID_MODEL,
-    max_tokens: 700,
+    model: DEEP_MODEL,
+    max_tokens: 1500,
     system: [
       {
         type: 'text',
