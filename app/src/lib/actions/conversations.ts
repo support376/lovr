@@ -153,3 +153,46 @@ export async function getOrCreateLatestConversation(
   if (recent[0]) return recent[0]
   return createConversation({ relationshipId })
 }
+
+/**
+ * 홈 채팅 한 세션 전체를 한 번에 아카이브.
+ * 메모리에 쌓인 messages 를 받아 새 conversation 로우 1개로 박음.
+ * 실패해도 UI 는 계속 돌도록 result 객체 반환.
+ */
+export async function archiveChat(input: {
+  relationshipId?: string | null
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+}): Promise<{ ok: true; id: string; title: string } | { ok: false; error: string }> {
+  try {
+    const uid = await requireUserId()
+    const filtered = input.messages.filter((m) => m.content.trim().length > 0)
+    if (filtered.length === 0) {
+      return { ok: false, error: '저장할 내용 없음' }
+    }
+
+    const now = Date.now()
+    const msgs: ConversationMessage[] = filtered.map((m) => ({
+      role: m.role,
+      content: m.content,
+      at: now,
+    }))
+
+    const firstUser = msgs.find((m) => m.role === 'user')?.content ?? '대화'
+    const title = firstUser.slice(0, 40).replace(/\n/g, ' ').trim() || '대화'
+
+    const id = `conv-${randomUUID()}`
+    await db.insert(conversations).values({
+      id,
+      userId: uid,
+      relationshipId: input.relationshipId ?? null,
+      title,
+      messages: msgs,
+    })
+
+    revalidatePath('/')
+    return { ok: true, id, title }
+  } catch (e) {
+    console.error('[archiveChat]', e)
+    return { ok: false, error: (e as Error).message ?? 'unknown' }
+  }
+}

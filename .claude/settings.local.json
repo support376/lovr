@@ -22,7 +22,21 @@
       "Bash(gh api:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:lovr-wheat.vercel.app)",
-      "WebFetch(domain:app-smoky-two.vercel.app)"
+      "WebFetch(domain:app-smoky-two.vercel.app)",
+      "Bash(vercel --version)",
+      "Bash(vercel ls *)",
+      "Bash(npm i *)",
+      "Bash(npm uninstall *)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(vercel env *)",
+      "Bash(vercel --prod --yes)",
+      "Bash(git mv *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(awk -F= '{print $2}')",
+      "Bash(git restore *)",
+      "Bash(git branch *)",
+      "Bash(git reset *)",
+      "Bash(npx next *)"
     ]
   }
 }

@@ -222,6 +222,27 @@ export type RelationshipModel = {
   updatedAt: number
   /** LLM 주입용 3~5 문장 축약 */
   narrative: string
+  /** 케미·상호 비교 layer. 기존 모델(구버전) 은 undefined 가능. */
+  compat?: RelationshipCompat
+}
+
+/**
+ * 상대 baseline + rules 위에 얹는 관계 궁합 layer.
+ * 추출 시 함께 계산 · UI 에서 한 눈에 케미 보여주기 위한 것.
+ */
+export type RelationshipCompat = {
+  /** 0~100 종합 궁합 점수 */
+  score: number
+  /** 한 줄 헤드라인 (15~30자, 축 ID·영문 금지) */
+  headline: string
+  /** 잘 맞는 점 2~4개 · 구체 관찰 기반 */
+  matches: string[]
+  /** 안 맞는 점 2~4개 · 구체 관찰 기반 */
+  frictions: string[]
+  /** "이 관계 속 나" 1줄 요약 */
+  selfOneLine: string
+  /** 나의 8축 baseline — 이 관계에서 내가 보이는 행동 기울기 0~100 */
+  selfBaseline: Record<Axis, number>
 }
 
 // ============================================================================

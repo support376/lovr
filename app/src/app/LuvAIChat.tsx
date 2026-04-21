@@ -1,35 +1,63 @@
 'use client'
 
 import { useRef, useEffect, useState, useTransition } from 'react'
-import { Send, Sparkles, MessageSquare } from 'lucide-react'
+import { Send, RotateCcw, Save, ChevronDown, Trash2 } from 'lucide-react'
 import { askLuvAI, type LuvAIMessage } from '@/lib/actions/luvai'
-import { simulateResponseAction } from '@/lib/actions/model'
-import { Card, Pill } from '@/components/ui'
+import {
+  archiveChat,
+  deleteConversation,
+  getConversation,
+} from '@/lib/actions/conversations'
 
-export type ChatApi = {
-  submitText: (text: string) => void
+type Archive = {
+  id: string
+  title: string
+  updatedAt: number
+  messageCount: number
+  relationshipId: string | null
 }
 
+/**
+ * 홈 AI 채팅 — 메모리 전용. 한 세션 = 한 대화.
+ * - 저장 버튼: 현재 세션 통째로 archiveChat 으로 conversations 테이블에 박음.
+ * - 리셋: 저장 안 하고 날림.
+ * - 분석 업데이트 감지 (modelUpdatedAt 변화): "저장하고 리셋" 배너.
+ * - 하단 이전 대화 리스트: 클릭 시 읽기전용 뷰. 삭제 가능.
+ */
 export function LuvAIChat({
-  targetAlias,
   relationshipId,
-  hasModel,
-  messages,
-  setMessages,
-  apiRef,
+  modelUpdatedAt,
+  archives: initialArchives,
 }: {
-  targetAlias: string | null
   relationshipId: string | null
-  hasModel: boolean
-  messages: LuvAIMessage[]
-  setMessages: (fn: (prev: LuvAIMessage[]) => LuvAIMessage[]) => void
-  apiRef?: React.MutableRefObject<ChatApi | null>
+  modelUpdatedAt: number | null
+  archives: Archive[]
 }) {
+  const [messages, setMessages] = useState<LuvAIMessage[]>([])
   const [input, setInput] = useState('')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'chat' | 'simulate'>('chat')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [archives, setArchives] = useState<Archive[]>(initialArchives)
+  const [openArchive, setOpenArchive] = useState(false)
+  const [readonlyView, setReadonlyView] = useState<{
+    title: string
+    messages: LuvAIMessage[]
+  } | null>(null)
+  const [analysisBanner, setAnalysisBanner] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const sessionStartModelAtRef = useRef<number | null>(modelUpdatedAt)
+
+  useEffect(() => {
+    if (
+      modelUpdatedAt != null &&
+      sessionStartModelAtRef.current != null &&
+      modelUpdatedAt !== sessionStartModelAtRef.current &&
+      messages.length > 0
+    ) {
+      setAnalysisBanner(true)
+    }
+  }, [modelUpdatedAt, messages.length])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -38,130 +66,158 @@ export function LuvAIChat({
     })
   }, [messages, pending])
 
-  const submit = (textOverride?: string) => {
-    const text = (textOverride ?? input).trim()
+  const submit = () => {
+    const text = input.trim()
     if (!text) return
-
+    if (readonlyView) setReadonlyView(null)
     const userMsg: LuvAIMessage = { role: 'user', content: text }
-    setMessages((prev) => [...prev, userMsg])
+    const next = [...messages, userMsg]
+    setMessages(next)
     setInput('')
     setError(null)
-
     start(async () => {
       try {
-        if (mode === 'simulate') {
-          if (!relationshipId) {
-            setError('시뮬레이션은 상대를 먼저 선택해야 해.')
-            return
-          }
-          if (!hasModel) {
-            setError(
-              '아직 모델이 없어. 분석 탭에서 "모델 추출" 먼저 돌려줘.'
-            )
-            return
-          }
-          const r = await simulateResponseAction(relationshipId, text)
-          if (!r.ok) {
-            setError(r.error)
-            return
-          }
-          setMessages((prev) => [...prev, { role: 'assistant', content: r.markdown }])
-        } else {
-          const history: LuvAIMessage[] = [...messages, userMsg]
-          const { reply } = await askLuvAI(history)
-          setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
-        }
+        const { reply } = await askLuvAI(next)
+        setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
       } catch (e) {
         setError((e as Error).message)
       }
     })
   }
 
-  if (apiRef) {
-    apiRef.current = { submitText: (t) => submit(t) }
+  const reset = () => {
+    setMessages([])
+    setError(null)
+    setAnalysisBanner(false)
+    sessionStartModelAtRef.current = modelUpdatedAt
   }
 
-  const empty = messages.length === 0
-  const quickPrompts =
-    mode === 'simulate'
-      ? [
-          '"주말에 와인바 갈래?" 이거 보내면?',
-          '48시간 무응답 하면 어떻게 반응할까',
-          '솔직하게 감정 털어놓으면?',
-        ]
-      : targetAlias
-      ? [
-          '지금 상황 한 줄 요약',
-          '지금 당장 뭐 하면 좋을까',
-          '오늘 뭐 하지 말라고 경고해줘',
-          '다음 메시지 초안 좀',
-        ]
-      : ['연애 전반 고민 있어', '첫 상대 등록하고 싶은데']
+  const save = () => {
+    if (messages.length === 0) {
+      setNotice('저장할 내용 없음')
+      return
+    }
+    start(async () => {
+      const r = await archiveChat({ relationshipId, messages })
+      if (!r.ok) {
+        setError(r.error)
+        return
+      }
+      setArchives((prev) => [
+        {
+          id: r.id,
+          title: r.title,
+          updatedAt: Date.now(),
+          messageCount: messages.length,
+          relationshipId,
+        },
+        ...prev,
+      ])
+      setNotice('저장됨')
+      setTimeout(() => setNotice(null), 2000)
+    })
+  }
+
+  const saveAndReset = () => {
+    if (messages.length === 0) {
+      reset()
+      return
+    }
+    start(async () => {
+      const r = await archiveChat({ relationshipId, messages })
+      if (!r.ok) {
+        setError(r.error)
+        return
+      }
+      setArchives((prev) => [
+        {
+          id: r.id,
+          title: r.title,
+          updatedAt: Date.now(),
+          messageCount: messages.length,
+          relationshipId,
+        },
+        ...prev,
+      ])
+      reset()
+    })
+  }
+
+  const openArchived = (id: string) => {
+    start(async () => {
+      const c = await getConversation(id)
+      if (!c) {
+        setError('대화를 찾을 수 없어')
+        return
+      }
+      setReadonlyView({
+        title: c.title,
+        messages: (c.messages ?? []).map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      })
+      setOpenArchive(false)
+    })
+  }
+
+  const removeArchived = (id: string) => {
+    if (!confirm('이 대화 삭제?')) return
+    start(async () => {
+      await deleteConversation(id)
+      setArchives((prev) => prev.filter((a) => a.id !== id))
+      if (readonlyView) setReadonlyView(null)
+    })
+  }
+
+  const viewMessages = readonlyView?.messages ?? messages
 
   return (
-    <Card className="flex flex-col gap-3 flex-1 min-h-0">
-      {/* 모드 토글 */}
-      {targetAlias && (
-        <div className="flex items-center gap-2 shrink-0">
-          <Pill tone="accent">{targetAlias}</Pill>
-          <div className="ml-auto flex gap-1 text-[11px]">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
+      {analysisBanner && (
+        <div className="shrink-0 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-xs flex items-start gap-2">
+          <div className="flex-1 leading-snug">
+            <strong>분석이 업데이트됐어.</strong>
+            <br />
+            새로 물어보면 지금 대화가 지워져. 저장할래?
+          </div>
+          <div className="flex flex-col gap-1 shrink-0">
             <button
-              type="button"
-              onClick={() => setMode('chat')}
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border ${
-                mode === 'chat'
-                  ? 'bg-accent/15 border-accent/40 text-accent'
-                  : 'bg-surface-2 border-border text-muted'
-              }`}
+              onClick={saveAndReset}
+              disabled={pending}
+              className="px-2 py-1 rounded-md bg-accent text-white text-[11px] font-medium disabled:opacity-40"
             >
-              <MessageSquare size={10} /> 대화
+              저장 후 리셋
             </button>
             <button
-              type="button"
-              onClick={() => setMode('simulate')}
-              disabled={!hasModel}
-              title={!hasModel ? '먼저 분석 탭에서 모델 추출' : ''}
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border disabled:opacity-40 ${
-                mode === 'simulate'
-                  ? 'bg-accent-2/15 border-accent-2/40 text-accent-2'
-                  : 'bg-surface-2 border-border text-muted'
-              }`}
+              onClick={reset}
+              disabled={pending}
+              className="px-2 py-1 rounded-md bg-surface-2 text-muted text-[11px] disabled:opacity-40"
             >
-              <Sparkles size={10} /> 시뮬
+              그냥 리셋
             </button>
           </div>
         </div>
       )}
 
+      {readonlyView && (
+        <div className="shrink-0 rounded-xl bg-surface-2 border border-border px-3 py-2 text-xs flex items-center gap-2">
+          <span className="text-muted">보기:</span>
+          <span className="flex-1 font-medium truncate">{readonlyView.title}</span>
+          <button
+            onClick={() => setReadonlyView(null)}
+            className="text-muted hover:text-text text-[11px]"
+          >
+            닫기
+          </button>
+        </div>
+      )}
+
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 px-0.5"
+        className="flex-1 overflow-y-auto flex flex-col gap-2 min-h-0"
       >
-        {empty && (
-          <>
-            <div className="text-xs text-muted leading-relaxed py-4 text-center">
-              {mode === 'simulate'
-                ? `"이 행동 X 하면 ${targetAlias} 어떻게 반응할까?" — 모델 기반 예측.`
-                : targetAlias
-                ? `${targetAlias}에 대한 상황·고민·메시지 초안 뭐든 물어봐.`
-                : '연애 고민 뭐든 물어봐. 상대 등록하면 훨씬 맥락 있게 답해.'}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {quickPrompts.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => submit(p)}
-                  disabled={pending}
-                  className="text-xs px-2.5 py-1.5 rounded-full bg-surface-2 border border-border text-muted hover:border-accent/40"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {messages.map((m, i) => (
+        {viewMessages.map((m, i) => (
           <div
             key={i}
             className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
@@ -173,47 +229,123 @@ export function LuvAIChat({
             {m.content}
           </div>
         ))}
-        {pending && (
+        {pending && !readonlyView && (
           <div className="self-start rounded-2xl px-3 py-2 text-sm bg-surface-2 text-muted">
-            <span className="inline-block animate-pulse">
-              {mode === 'simulate' ? '시뮬레이션 중…' : 'LuvAI 생각 중…'}
-            </span>
+            <span className="inline-block animate-pulse">LuvAI 생각 중…</span>
           </div>
         )}
         {error && (
-          <div className="self-center text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg px-3 py-2 whitespace-pre-wrap">
+          <div className="self-center text-xs text-bad bg-bad/10 border border-bad/30 rounded-lg px-3 py-2 max-w-full break-words">
             {error}
           </div>
         )}
+        {notice && (
+          <div className="self-center text-[11px] text-muted">{notice}</div>
+        )}
       </div>
 
-      <div className="shrink-0 flex gap-2 pt-1 items-end">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              submit()
-            }
-          }}
-          placeholder={
-            mode === 'simulate'
-              ? '이 X 를 하면? (행동·메시지 서술)'
-              : '지금 어떤 도움을 드릴까요?'
-          }
-          rows={1}
-          className="flex-1 rounded-xl bg-surface-2 border border-border px-3 py-2.5 text-sm outline-none focus:border-accent resize-none min-h-[40px] max-h-[120px]"
-        />
-        <button
-          onClick={() => submit()}
-          disabled={pending || !input.trim()}
-          className="shrink-0 w-10 h-10 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-40"
-          aria-label="전송"
-        >
-          <Send size={16} />
-        </button>
-      </div>
-    </Card>
+      {!readonlyView && (
+        <div className="shrink-0 flex gap-1.5 items-end">
+          {messages.length > 0 && (
+            <>
+              <button
+                onClick={save}
+                disabled={pending}
+                className="shrink-0 w-9 h-9 rounded-xl bg-surface-2 border border-border text-muted hover:text-accent flex items-center justify-center disabled:opacity-40"
+                aria-label="저장"
+                title="대화 저장"
+              >
+                <Save size={14} />
+              </button>
+              <button
+                onClick={reset}
+                disabled={pending}
+                className="shrink-0 w-9 h-9 rounded-xl bg-surface-2 border border-border text-muted hover:text-bad flex items-center justify-center disabled:opacity-40"
+                aria-label="리셋"
+                title="리셋 (저장 안 됨)"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </>
+          )}
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+            placeholder="질문 뭐든."
+            rows={1}
+            className="flex-1 rounded-xl bg-surface-2 border border-border px-3 py-2.5 text-sm outline-none focus:border-accent resize-none min-h-[40px] max-h-[140px]"
+          />
+          <button
+            onClick={submit}
+            disabled={pending || !input.trim()}
+            className="shrink-0 w-9 h-9 rounded-xl bg-accent text-white flex items-center justify-center disabled:opacity-40"
+            aria-label="전송"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      )}
+
+      {archives.length > 0 && (
+        <div className="shrink-0 border-t border-border pt-2 -mx-1 px-1">
+          <button
+            onClick={() => setOpenArchive((v) => !v)}
+            className="w-full flex items-center gap-1.5 text-[11px] text-muted hover:text-text py-1"
+          >
+            <ChevronDown
+              size={12}
+              className={`transition-transform ${openArchive ? '' : '-rotate-90'}`}
+            />
+            이전 대화 ({archives.length})
+          </button>
+          {openArchive && (
+            <ul className="flex flex-col gap-1 mt-1 max-h-[140px] overflow-y-auto">
+              {archives.map((a) => (
+                <li
+                  key={a.id}
+                  className="group flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-[11px]"
+                >
+                  <button
+                    onClick={() => openArchived(a.id)}
+                    className="flex-1 min-w-0 text-left hover:text-accent"
+                  >
+                    <div className="truncate font-medium">{a.title}</div>
+                    <div className="text-muted text-[10px]">
+                      {a.messageCount}개 · {timeAgo(a.updatedAt)}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => removeArchived(a.id)}
+                    disabled={pending}
+                    className="shrink-0 text-muted hover:text-bad opacity-0 group-hover:opacity-100 disabled:opacity-40"
+                    aria-label="삭제"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   )
+}
+
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return '방금'
+  if (m < 60) return `${m}분 전`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}시간 전`
+  const d = Math.floor(h / 24)
+  if (d < 30) return `${d}일 전`
+  return new Date(ts).toLocaleDateString('ko-KR')
 }

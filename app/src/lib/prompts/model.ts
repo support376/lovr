@@ -82,17 +82,48 @@ intensity 강도:
   },
   "narrative": "서연은 평소 현상 유지 선호가 강하고, 인혁이 감정을 공개하거나 관계 격상을 제안할 때마다 감정을 숨기거나 화제를 전환한다. 3회 이상 반복된 패턴: 인혁 거리두기 → 서연 먼저 연락. 갈등 상황에서 인혁이 사과하면 일시 풀리지만 곧 이전 패턴으로 회귀.",
   "confidenceOverall": 50,
+  "compat": {
+    "score": 58,
+    "headline": "템포 비슷, 감정 표현 결은 엇갈림",
+    "matches": [
+      "둘 다 즉흥 제안보다 계획 있는 만남 선호",
+      "직장·일 얘기 농도 비슷해 공감대 유지"
+    ],
+    "frictions": [
+      "내가 감정 드러내면 상대 화제 전환",
+      "관계 격상 제안 타이밍에 상대 속도 조절"
+    ],
+    "selfOneLine": "불안하면 당기고, 조용해지면 풀리는 편",
+    "selfBaseline": {
+      "proximity_push": 65,
+      "proximity_pull": 30,
+      "emotion_open": 55,
+      "emotion_hide": 35,
+      "commit_push": 60,
+      "commit_hold": 30,
+      "conflict_press": 40,
+      "conflict_soothe": 40
+    }
+  },
   "rationale": "주요 판단 근거 2~4줄."
 }
 
+# compat 필드 (필수)
+- **score**: 0~100. rules 와 baseline 의 상호 호환성 + 최근 상호작용 톤 복합 판단. 규칙 공식 쓰지 말고 종합 판단.
+  - <45: 갈등·엇갈림 지배. 45~65: 혼재. >65: 궤도 맞음.
+- **headline**: 15~30자. 축 ID·영문 금지. 한국어 자연어.
+- **matches / frictions**: 각 2~4개. **구체 관찰 인용**. "소통 잘 됨" 같은 추상 금지.
+- **selfOneLine**: "이 관계 속 유저"를 한 문장으로. 이름 생략.
+- **selfBaseline**: 유저(self Actor) 가 이 관계에서 보이는 행동 기울기. Event 에서 유저 발화·행동을 근거로 추출. 데이터 부족하면 50.
+
 # 언어 규약 (중요!)
-**narrative 두 개와 rationale 필드는 순수 한국어만.**
-- 축 ID (proximity_push, commit_hold, emotion_open 등) narrative 안에 **절대 노출 금지**.
+**narrative 두 개와 compat.headline, compat.matches, compat.frictions, compat.selfOneLine, rationale 필드는 순수 한국어만.**
+- 축 ID (proximity_push, commit_hold, emotion_open 등) 이 필드들 안에 **절대 노출 금지**.
 - 축 개념 언급할 땐 한국어로 풀어 쓴다: "접근", "거리두기", "감정 공개", "현상 유지" 등.
 - 영어 단어 섞지 말 것 (예외: 고유명사, goal ID).
-- "X", "Y", "aX+b" 같은 수식 표기도 narrative 에 쓰지 말 것.
+- "X", "Y", "aX+b" 같은 수식 표기도 narrative·compat 에 쓰지 말 것.
 
-rules 필드의 xAxis/yAxis 는 당연히 축 ID 그대로 (구조 값).
+rules, baseline.axes, compat.selfBaseline 의 키는 당연히 축 ID 그대로 (구조 값).
 examples 는 원문 그대로 (유저 표현 보존).
 
 # 검증 체크리스트
@@ -101,7 +132,9 @@ examples 는 원문 그대로 (유저 표현 보존).
 - observations ≤ 전체 Event 개수.
 - confidence ∈ [0, 100] 정수. 샘플 수 대비 과대평가 금지.
 - rules 최대 6개 (중복 합치고 남은 것만).
-- narrative 에 축 ID·영문·수식 표기 없음 확인.
+- narrative·compat 자연어 필드에 축 ID·영문·수식 표기 없음 확인.
+- compat.selfBaseline 8개 축 전부 채움 (데이터 없으면 50).
+- compat.score ∈ [0, 100].
 - 증거 약한 규칙 빼라.
 
 # 주의

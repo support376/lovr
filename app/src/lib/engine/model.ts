@@ -12,6 +12,7 @@ import {
   type Event,
   type Relationship,
   type RelationshipBaseline,
+  type RelationshipCompat,
   type RelationshipModel,
   type RelationshipRule,
   type RelationshipState,
@@ -42,12 +43,22 @@ type RawBaseline = {
   narrative?: string
 }
 
+type RawCompat = {
+  score?: number | string
+  headline?: string
+  matches?: unknown
+  frictions?: unknown
+  selfOneLine?: string
+  selfBaseline?: Partial<Record<string, number | string>>
+}
+
 type RawModel = {
   rules?: RawRule[]
   baseline?: RawBaseline
   narrative?: string
   confidenceOverall?: number | string
   rationale?: string
+  compat?: RawCompat
 }
 
 function isAxis(v: unknown): v is Axis {
@@ -93,6 +104,37 @@ function parseBaseline(raw: RawBaseline | undefined): RelationshipBaseline {
   }
   base.narrative = typeof raw.narrative === 'string' ? raw.narrative.trim() : ''
   return base
+}
+
+function parseAxisMap(
+  raw: Partial<Record<string, number | string>> | undefined
+): Record<Axis, number> {
+  const out = {} as Record<Axis, number>
+  for (const ax of AXES) {
+    out[ax] = clampInt(raw?.[ax], 50, 0, 100)
+  }
+  return out
+}
+
+function parseStrArr(v: unknown, max: number): string[] {
+  if (!Array.isArray(v)) return []
+  return v
+    .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+    .map((s) => s.trim())
+    .slice(0, max)
+}
+
+function parseCompat(raw: RawCompat | undefined): RelationshipCompat | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  return {
+    score: clampInt(raw.score, 50, 0, 100),
+    headline: typeof raw.headline === 'string' ? raw.headline.trim() : '',
+    matches: parseStrArr(raw.matches, 4),
+    frictions: parseStrArr(raw.frictions, 4),
+    selfOneLine:
+      typeof raw.selfOneLine === 'string' ? raw.selfOneLine.trim() : '',
+    selfBaseline: parseAxisMap(raw.selfBaseline),
+  }
 }
 
 function parseRules(
@@ -219,6 +261,7 @@ export async function extractRelationshipModel(
   const rules = parseRules(parsed.rules, evidenceIds, evList.length, now)
   const baseline = parseBaseline(parsed.baseline)
   const confidenceOverall = clampInt(parsed.confidenceOverall, 50, 0, 100)
+  const compat = parseCompat(parsed.compat)
 
   const previousVersion = rel.model?.version ?? 0
 
@@ -232,6 +275,7 @@ export async function extractRelationshipModel(
     updatedAt: now,
     narrative:
       typeof parsed.narrative === 'string' ? parsed.narrative.trim() : '',
+    ...(compat ? { compat } : {}),
   }
 
   await db
