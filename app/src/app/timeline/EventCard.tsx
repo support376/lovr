@@ -4,7 +4,12 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, X, Save } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
-import { deleteEvent, updateEvent, type EventType } from '@/lib/actions/events'
+import {
+  deleteEvent,
+  updateEvent,
+  type EventType,
+  type EventSender,
+} from '@/lib/actions/events'
 import type { Event } from '@/lib/db/schema'
 
 const TYPE_LABEL: Record<string, string> = {
@@ -19,10 +24,10 @@ const TYPE_LABEL: Record<string, string> = {
   external_info: '외부',
 }
 
-const EDIT_TYPES: Array<{ v: EventType; l: string }> = [
-  { v: 'message', l: '카톡' },
-  { v: 'call', l: '통화' },
-  { v: 'note', l: '메모' },
+const EDIT_TYPES: Array<{ v: EventType; l: string; sender: boolean }> = [
+  { v: 'message', l: '카톡', sender: true },
+  { v: 'call', l: '통화', sender: true },
+  { v: 'note', l: '메모', sender: false },
 ]
 
 function fmtDate(ts: number): string {
@@ -41,16 +46,27 @@ function toInputDate(ts: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-/**
- * 카드 기본: 요약 한 줄 (타입 · 제목/내용 · 날짜).
- * 클릭 → 확장: 전체 내용 + 삭제 + 편집 모드.
- */
+function SenderBadge({ sender }: { sender: EventSender }) {
+  if (!sender) return null
+  const label = sender === 'me' ? '나' : '상대'
+  const cls =
+    sender === 'me'
+      ? 'bg-accent-2/15 text-accent-2 border-accent-2/30'
+      : 'bg-accent/15 text-accent border-accent/30'
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
 export function EventCard({ e }: { e: Event }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [content, setContent] = useState(e.content)
   const [why, setWhy] = useState(e.selfNote ?? '')
   const [type, setType] = useState<EventType>(e.type as EventType)
+  const [sender, setSender] = useState<EventSender>((e.sender as EventSender) ?? 'me')
   const [date, setDate] = useState(
     toInputDate(e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp))
   )
@@ -59,12 +75,15 @@ export function EventCard({ e }: { e: Event }) {
   const router = useRouter()
 
   const ts = e.timestamp instanceof Date ? e.timestamp.getTime() : Number(e.timestamp)
+  const eventSender = (e.sender ?? null) as EventSender
 
-  // 제목 추출: 첫 줄 **title** 패턴
   const titleMatch = e.content.match(/^\*\*(.+?)\*\*/)
   const summary = titleMatch
     ? titleMatch[1]
     : e.content.split('\n')[0].slice(0, 50)
+
+  const currentType = EDIT_TYPES.find((o) => o.v === type)
+  const senderApplicable = currentType?.sender ?? false
 
   const save = () => {
     if (!content.trim()) return
@@ -78,6 +97,7 @@ export function EventCard({ e }: { e: Event }) {
           selfNote: why.trim() ? why.trim() : null,
           type,
           timestamp: newTs,
+          sender: senderApplicable ? sender : null,
         })
         setEditing(false)
         router.refresh()
@@ -118,6 +138,29 @@ export function EventCard({ e }: { e: Event }) {
             </button>
           ))}
         </div>
+
+        {senderApplicable && (
+          <div className="flex gap-1.5 mb-2">
+            <div className="shrink-0 py-1 px-1 text-[10px] text-muted">발신</div>
+            {(['me', 'partner'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSender(s)}
+                className={`flex-1 py-1 rounded text-[11px] border ${
+                  sender === s
+                    ? s === 'me'
+                      ? 'bg-accent-2/15 border-accent-2/40 text-accent-2'
+                      : 'bg-accent/15 border-accent/40 text-accent'
+                    : 'bg-surface-2 border-border text-muted'
+                }`}
+              >
+                {s === 'me' ? '나' : '상대'}
+              </button>
+            ))}
+          </div>
+        )}
+
         <input
           type="date"
           value={date}
@@ -152,6 +195,7 @@ export function EventCard({ e }: { e: Event }) {
               setContent(e.content)
               setWhy(e.selfNote ?? '')
               setType(e.type as EventType)
+              setSender((e.sender as EventSender) ?? 'me')
               setDate(toInputDate(ts))
             }}
             disabled={pending}
@@ -167,7 +211,6 @@ export function EventCard({ e }: { e: Event }) {
     )
   }
 
-  // 기본 간결 1-line
   return (
     <Card className="!py-2.5 !px-3">
       <button
@@ -177,6 +220,7 @@ export function EventCard({ e }: { e: Event }) {
         <span className="px-1.5 py-0.5 rounded bg-surface-2 text-[11px] text-muted shrink-0">
           {TYPE_LABEL[e.type] ?? e.type}
         </span>
+        <SenderBadge sender={eventSender} />
         <span className="flex-1 min-w-0 text-sm truncate">{summary}</span>
         <span className="text-[11px] text-muted shrink-0">{fmtDate(ts)}</span>
       </button>

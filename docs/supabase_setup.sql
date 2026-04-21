@@ -88,12 +88,14 @@ create table events (
   type text not null,
   content text not null,
   transcript text,
+  sender text,
   attachments jsonb not null default '[]'::jsonb,
   self_note text,
   context_tags jsonb not null default '[]'::jsonb
 );
 create index on events(user_id);
 create index on events(relationship_id, timestamp desc);
+create index on events(relationship_id, sender, timestamp desc);
 
 -- ----------------------------------------------------------------------------
 -- goals (legacy placeholder — ontology 제거 후 엔진이 'auto' 1개 자동 생성)

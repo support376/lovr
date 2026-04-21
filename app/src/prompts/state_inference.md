@@ -20,10 +20,22 @@
   "investmentAsymmetry": "자연어 1문장 or 빈 문자열",
   "escalationSpeed": "자연어 1문장 or 빈 문자열",
   "selfTraits": [
-    {"observation": "예) 관대함 경향 — 갈등 시 먼저 사과", "confidence": "낮음|중간|높음"}
+    {
+      "axis": "예) 주도성 · 관대함 · 안정선호 (선택)",
+      "group": "personality|attachment|communication (선택)",
+      "score": 0~100 정수 (axis 설정 시 같이, 50=중립),
+      "observation": "예) 관대함 경향 — 갈등 시 먼저 사과",
+      "confidence": "낮음|중간|높음"
+    }
   ],
   "partnerTraits": [
-    {"observation": "예) 보수적 가치관 — 결혼·가족 화제 자주 꺼냄", "confidence": "낮음|중간|높음"}
+    {
+      "axis": "예) 보수성 · 공감능력 · 회피 애착 (선택)",
+      "group": "personality|attachment|communication (선택)",
+      "score": 0~100,
+      "observation": "예) 보수적 가치관 — 결혼·가족 화제 자주 꺼냄",
+      "confidence": "낮음|중간|높음"
+    }
   ],
   "rationale": "주요 판단 근거 2~4줄. 어느 Event를 보고 어떻게 판단했는지."
 }
@@ -48,9 +60,12 @@
 - **investmentAsymmetry**: 시간·감정·돈 비대칭.
 - **escalationSpeed**: 친밀·스킨십 심화 속도.
 - **selfTraits / partnerTraits**: Event에서 **역프로파일링**된 행동 특성. MBTI/자가진단이 아니라 실제 행동·대사·선택에서 추출.
-  - 권장 축 예시(고정 아님): 이기적↔관대함 · 진보↔보수 · 안정↔모험 · 주도↔수동 · 감정↔논리 · 단기↔장기 · 일관↔변덕.
-  - 각 항목은 1문장. 근거가 약하면 빼라. 과거 관찰과 일치하면 확신 상향, 상충하면 빼거나 새 관찰로 대체.
-  - 많아야 최대 5개씩.
+  - 권장 축 예시: 주도성 · 관대함 · 보수성 · 안정선호 · 감정표현 · 일관성 · 응답속도 · 깊이선호.
+  - 권장 group: `personality` (성격 축) · `attachment` (애착: 불안형·회피형·안정형·혼란형) · `communication` (소통: 주도성·응답속도·깊이 등).
+  - **axis + score 둘 다 채우면 UI 에서 수평 바로 시각화됨.** 근거 불분명하면 axis/score 빼고 observation 만.
+  - score 기준: 50=중립, 0=완전 반대 극, 100=완전 극. "높음" ≠ 100, 강도에 비례.
+  - 각 항목은 observation 1문장 필수. 근거 약하면 빼라. 과거 관찰과 상충하면 교체.
+  - 많아야 최대 6개씩.
 
 ## 입력 구조
 

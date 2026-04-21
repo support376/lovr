@@ -63,6 +63,12 @@ export const actors = pgTable('actors', {
 })
 
 export type InferredTrait = {
+  /** 선택적 축 라벨 — "외향성" / "불안형 애착" / "주도성" 등. 설정되면 score 와 짝으로 바 차트에. */
+  axis?: string
+  /** 선택적 0~100 점수. axis 와 함께만 의미 있음. */
+  score?: number
+  /** 축 그룹 — "personality" / "attachment" / "communication" 등. 미설정 시 기타. */
+  group?: string
   observation: string
   evidenceEventIds: string[]
   confidenceNarrative: string
@@ -122,6 +128,9 @@ export const events = pgTable('events', {
   type: text('type').notNull(),
   content: text('content').notNull(),
   transcript: text('transcript'),
+
+  /** 발신자 — 'me' | 'partner' | null. 카톡·통화 등 메시지 성격 이벤트에서 채워짐. */
+  sender: text('sender'),
 
   attachments: jsonb('attachments')
     .$type<string[]>()

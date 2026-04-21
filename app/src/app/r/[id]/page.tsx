@@ -1,16 +1,14 @@
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { Zap, RefreshCw } from 'lucide-react'
+import { Zap } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
-import { Card } from '@/components/ui'
+import { listEvents } from '@/lib/actions/events'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DeriveStateButton } from './DeriveStateButton'
+import { MetricsCard } from './MetricsCard'
+import { TraitsBars } from './TraitsBars'
 import type { InferredTrait } from '@/lib/db/schema'
-
-/**
- * 관계 탭 상세 — 프로필 + AI 추출 분석 전용. 전략은 /s/[id] 로 분리.
- */
 
 const PROGRESS_KO: Record<string, string> = {
   unknown: '판단 불가',
@@ -52,6 +50,8 @@ export default async function RelationshipProfilePage({
     { k: '심화 속도', v: rel.escalationSpeed },
   ].filter((d) => d.v)
 
+  const events = await listEvents(id, 500)
+
   return (
     <>
       <header className="px-5 pt-4 pb-3 flex items-start gap-3">
@@ -89,13 +89,16 @@ export default async function RelationshipProfilePage({
       </header>
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">
-        {/* 재분석 버튼 — 최근 Event 기반 */}
+        {/* 재분석 버튼 */}
         <div className="flex items-center justify-between">
-          <div className="text-xs text-muted">Event에서 자동 추출된 분석</div>
+          <div className="text-xs text-muted">Event 에서 자동 추출된 분석</div>
           <DeriveStateButton relationshipId={id} />
         </div>
 
-        {/* 관계 dynamics 4축 */}
+        {/* 대화 메트릭스 — sender 있는 event 기반 */}
+        <MetricsCard events={events} partnerName={rel.partner.displayName} />
+
+        {/* 관계 dynamics 4축 (자연어) */}
         {dynamicsItems.length > 0 && (
           <section>
             <div className="text-xs text-muted uppercase tracking-wider mb-2">
@@ -117,14 +120,18 @@ export default async function RelationshipProfilePage({
           </section>
         )}
 
-        {/* 나 vs 상대 관찰 누적 */}
+        {/* 나 vs 상대 Traits (바 + 자유 관찰) */}
         <section>
           <div className="text-xs text-muted uppercase tracking-wider mb-2">
-            나 vs 상대 · Event에서 추출
+            나 vs 상대 · Event 기반 추출
           </div>
           <div className="grid grid-cols-1 gap-3">
-            <TraitsCard title="나" tone="accent-2" traits={selfTraits} />
-            <TraitsCard title={rel.partner.displayName} tone="accent" traits={partnerTraits} />
+            <TraitsBars title="나" tone="accent-2" traits={selfTraits} />
+            <TraitsBars
+              title={rel.partner.displayName}
+              tone="accent"
+              traits={partnerTraits}
+            />
           </div>
         </section>
 
@@ -137,40 +144,5 @@ export default async function RelationshipProfilePage({
         </section>
       </div>
     </>
-  )
-}
-
-function TraitsCard({
-  title,
-  tone,
-  traits,
-}: {
-  title: string
-  tone: 'accent' | 'accent-2'
-  traits: InferredTrait[]
-}) {
-  const borderClass = tone === 'accent' ? 'border-accent/30' : 'border-accent-2/30'
-  const bgClass =
-    tone === 'accent' ? 'bg-accent/5' : 'bg-accent-2/5'
-  const headerClass = tone === 'accent' ? 'text-accent' : 'text-accent-2'
-
-  return (
-    <Card className={`${borderClass} ${bgClass}`}>
-      <div className={`text-xs font-semibold mb-2 ${headerClass}`}>{title}</div>
-      {traits.length === 0 ? (
-        <div className="text-[11px] text-muted leading-relaxed inline-flex items-center gap-1.5">
-          <RefreshCw size={11} /> 아직 관찰 없음. 기록 탭에 대화·사건 쌓고 위 &ldquo;재분석&rdquo; 눌러.
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {traits.map((t, i) => (
-            <li key={i} className="text-xs leading-relaxed">
-              • {t.observation}
-              <span className="text-muted ml-1">({t.confidenceNarrative})</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
   )
 }

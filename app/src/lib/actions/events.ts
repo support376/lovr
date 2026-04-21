@@ -5,6 +5,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '../db/client'
 import { events, relationships, type Event } from '../db/schema'
+import { ensureRuntimeColumns } from '../db/ensure'
 import { requireUserId } from '../supabase/server'
 
 export type EventType =
@@ -17,6 +18,8 @@ export type EventType =
   | 'conflict'
   | 'recovery'
   | 'external_info'
+
+export type EventSender = 'me' | 'partner' | null
 
 async function assertRelationshipOwned(relationshipId: string, uid: string) {
   const [r] = await db
@@ -36,7 +39,9 @@ export async function addEvent(input: {
   attachments?: string[]
   selfNote?: string
   contextTags?: string[]
+  sender?: EventSender
 }): Promise<{ eventId: string }> {
+  await ensureRuntimeColumns()
   const uid = await requireUserId()
   await assertRelationshipOwned(input.relationshipId, uid)
 
@@ -51,6 +56,7 @@ export async function addEvent(input: {
     type: input.type,
     content: input.content,
     transcript: input.transcript ?? null,
+    sender: input.sender ?? null,
     attachments: input.attachments ?? [],
     selfNote: input.selfNote ?? null,
     contextTags: input.contextTags ?? [],
@@ -65,6 +71,7 @@ export async function listEvents(
   relationshipId: string,
   limit = 200
 ): Promise<Event[]> {
+  await ensureRuntimeColumns()
   const uid = await requireUserId()
   return db
     .select()
@@ -80,13 +87,16 @@ export async function updateEvent(input: {
   content?: string
   selfNote?: string | null
   timestamp?: number
+  sender?: EventSender
 }): Promise<void> {
+  await ensureRuntimeColumns()
   const uid = await requireUserId()
   const updates: Record<string, unknown> = {}
   if (input.type !== undefined) updates.type = input.type
   if (input.content !== undefined) updates.content = input.content
   if (input.selfNote !== undefined) updates.selfNote = input.selfNote
   if (input.timestamp !== undefined) updates.timestamp = new Date(input.timestamp)
+  if (input.sender !== undefined) updates.sender = input.sender
 
   const [row] = await db
     .select()
@@ -120,6 +130,7 @@ export async function listRecentEvents(
   relationshipId: string,
   sinceDays: number
 ): Promise<Event[]> {
+  await ensureRuntimeColumns()
   const uid = await requireUserId()
   const all = await db
     .select()

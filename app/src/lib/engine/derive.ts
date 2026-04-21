@@ -6,7 +6,13 @@ import { anthropic, MID_MODEL } from '../ai/client'
 import { buildContext } from './context'
 import { stateInferencePrompt } from '../prompts/loader'
 
-type RawTrait = { observation?: string; confidence?: string }
+type RawTrait = {
+  observation?: string
+  confidence?: string
+  axis?: string
+  group?: string
+  score?: number | string
+}
 
 export type DerivedState = {
   progress: string
@@ -188,6 +194,8 @@ ${current}`,
   return { derived, updatedFields }
 }
 
+const ALLOWED_GROUPS = new Set(['personality', 'attachment', 'communication'])
+
 function toInferredTraits(
   raw: RawTrait[],
   evidenceIds: string[],
@@ -195,13 +203,31 @@ function toInferredTraits(
 ): InferredTrait[] {
   return raw
     .filter((t) => t && typeof t.observation === 'string' && t.observation.trim())
-    .map((t) => ({
-      observation: t.observation!.trim(),
-      evidenceEventIds: evidenceIds,
-      confidenceNarrative: (t.confidence ?? '중간').trim() || '중간',
-      firstObserved: at,
-      lastUpdated: at,
-    }))
+    .map((t) => {
+      const rawScore =
+        typeof t.score === 'number'
+          ? t.score
+          : typeof t.score === 'string'
+          ? parseFloat(t.score)
+          : NaN
+      const score = Number.isFinite(rawScore)
+        ? Math.max(0, Math.min(100, Math.round(rawScore)))
+        : undefined
+      const axis = typeof t.axis === 'string' && t.axis.trim() ? t.axis.trim() : undefined
+      const groupRaw =
+        typeof t.group === 'string' ? t.group.trim().toLowerCase() : ''
+      const group = ALLOWED_GROUPS.has(groupRaw) ? groupRaw : undefined
+      return {
+        axis,
+        group,
+        score,
+        observation: t.observation!.trim(),
+        evidenceEventIds: evidenceIds,
+        confidenceNarrative: (t.confidence ?? '중간').trim() || '중간',
+        firstObserved: at,
+        lastUpdated: at,
+      }
+    })
 }
 
 function extractJson(s: string): string {
