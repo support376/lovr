@@ -4,7 +4,6 @@ import { Zap } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship, listRelationships } from '@/lib/actions/relationships'
 import { listEvents } from '@/lib/actions/events'
-import { setFocusRelationship } from '@/lib/actions/focus'
 import { PartnerInlineEditor } from './PartnerInlineEditor'
 import { DeriveStateButton } from './DeriveStateButton'
 import { MetricsCard } from './MetricsCard'
@@ -42,9 +41,6 @@ export default async function RelationshipProfilePage({
   const { id } = await params
   const rel = await getRelationship(id)
   if (!rel) notFound()
-
-  // 진입 시 focus 동기화
-  await setFocusRelationship(id)
 
   const all = await listRelationships()
 

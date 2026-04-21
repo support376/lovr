@@ -7,7 +7,6 @@ import {
   getRelationship,
   listRelationships,
 } from '@/lib/actions/relationships'
-import { setFocusRelationship } from '@/lib/actions/focus'
 import { db } from '@/lib/db/client'
 import { actions as actionsTbl, insights, outcomes } from '@/lib/db/schema'
 import { requireUserId } from '@/lib/supabase/server'
@@ -33,8 +32,6 @@ export default async function StrategyDetailPage({
   const { id } = await params
   const rel = await getRelationship(id)
   if (!rel) notFound()
-
-  await setFocusRelationship(id)
 
   const uid = await requireUserId()
   const all = await listRelationships()

@@ -6,7 +6,7 @@ import {
   listRelationships,
   getRelationship,
 } from '@/lib/actions/relationships'
-import { getFocusRelationshipId, setFocusRelationship } from '@/lib/actions/focus'
+import { getFocusRelationshipId } from '@/lib/actions/focus'
 import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
@@ -32,11 +32,6 @@ export default async function TimelinePage({
   const focusId = await getFocusRelationshipId()
   const preferredId = sp.rel ?? focusId ?? all[0]?.id ?? null
   const focused = preferredId ? await getRelationship(preferredId) : null
-
-  // ?rel 로 바뀌었으면 focus 도 동기화
-  if (sp.rel && sp.rel !== focusId) {
-    await setFocusRelationship(sp.rel)
-  }
 
   const events = focused ? await listEvents(focused.id, 50) : []
 
