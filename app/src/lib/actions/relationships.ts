@@ -11,7 +11,7 @@ import {
   type Relationship,
 } from '../db/schema'
 import { requireUserId } from '../supabase/server'
-import { getFocusRelationshipId } from './focus'
+import { getFocusRelationshipId } from '../server/focus'
 
 export async function listRelationships(): Promise<Array<Relationship & { partner: Actor }>> {
   const uid = await requireUserId()

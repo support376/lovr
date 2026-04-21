@@ -5,8 +5,8 @@ import { cookies } from 'next/headers'
 const COOKIE = 'focusRel'
 
 /**
- * 현재 포커스 중인 상대 id — 탭 간 공유용.
- * 기록·관계·전략·AI 모두 이 값을 우선 참조.
+ * 포커스 상대 ID 쓰기 (server action 전용 — 클라이언트에서만 호출).
+ * 읽기는 lib/server/focus.ts 의 getFocusRelationshipId 사용.
  */
 export async function setFocusRelationship(id: string | null): Promise<void> {
   const store = await cookies()
@@ -19,9 +19,4 @@ export async function setFocusRelationship(id: string | null): Promise<void> {
   } else {
     store.delete(COOKIE)
   }
-}
-
-export async function getFocusRelationshipId(): Promise<string | null> {
-  const store = await cookies()
-  return store.get(COOKIE)?.value ?? null
 }

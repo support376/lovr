@@ -8,24 +8,47 @@ import { LuvAIClientShell } from './LuvAIHomeClient'
 import { TargetSwitcher } from '@/components/TargetSwitcher'
 
 export default async function LuvAIHome() {
-  const self = await getSelf()
-  if (!self) return <Landing />
+  try {
+    const self = await getSelf()
+    if (!self) return <Landing />
 
-  const cur = await getCurrentRelationship()
-  const all = await listRelationships()
+    let cur: Awaited<ReturnType<typeof getCurrentRelationship>> = null
+    let all: Awaited<ReturnType<typeof listRelationships>> = []
 
-  return (
-    <>
-      {all.length > 0 && (
-        <div className="pt-3 pb-1">
-          <TargetSwitcher
-            relationships={all}
-            currentId={cur?.id ?? null}
-            route={{ kind: 'refresh' }}
-          />
-        </div>
-      )}
-      <LuvAIClientShell targetAlias={cur?.partner.displayName ?? null} />
-    </>
-  )
+    try {
+      all = await listRelationships()
+    } catch (e) {
+      console.error('[LuvAIHome listRelationships]', e)
+    }
+    try {
+      cur = await getCurrentRelationship()
+    } catch (e) {
+      console.error('[LuvAIHome getCurrentRelationship]', e)
+    }
+
+    return (
+      <>
+        {all.length > 0 && (
+          <div className="pt-3 pb-1">
+            <TargetSwitcher
+              relationships={all}
+              currentId={cur?.id ?? null}
+              route={{ kind: 'refresh' }}
+            />
+          </div>
+        )}
+        <LuvAIClientShell targetAlias={cur?.partner.displayName ?? null} />
+      </>
+    )
+  } catch (e) {
+    console.error('[LuvAIHome render]', e)
+    return (
+      <div className="p-5 text-sm">
+        <div className="font-semibold mb-2">홈 로드 실패</div>
+        <pre className="text-xs text-muted whitespace-pre-wrap bg-bad/5 border border-bad/30 rounded p-3">
+          {(e as Error).message ?? 'unknown'}
+        </pre>
+      </div>
+    )
+  }
 }

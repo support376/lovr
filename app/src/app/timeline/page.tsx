@@ -6,7 +6,7 @@ import {
   listRelationships,
   getRelationship,
 } from '@/lib/actions/relationships'
-import { getFocusRelationshipId } from '@/lib/actions/focus'
+import { getFocusRelationshipId } from '@/lib/server/focus'
 import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'

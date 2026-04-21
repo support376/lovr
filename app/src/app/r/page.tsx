@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import { listRelationships } from '@/lib/actions/relationships'
-import { getFocusRelationshipId } from '@/lib/actions/focus'
+import { getFocusRelationshipId } from '@/lib/server/focus'
 import { Button, Empty, PageHeader } from '@/components/ui'
 
 /**
