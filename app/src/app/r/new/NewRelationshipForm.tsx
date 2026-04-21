@@ -2,13 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Card, TextArea, TextInput } from '@/components/ui'
+import { Button, Card, TextInput } from '@/components/ui'
 import { createRelationship } from '@/lib/actions/relationships'
 
 export function NewRelationshipForm() {
   const [name, setName] = useState('')
-  const [notes, setNotes] = useState('')
-  const [constraints, setConstraints] = useState('')
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
@@ -18,16 +16,8 @@ export function NewRelationshipForm() {
     setErr(null)
     start(async () => {
       try {
-        const c = constraints
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-        const { relationshipId } = await createRelationship({
-          partnerName: name.trim(),
-          partnerRawNotes: notes.trim() || undefined,
-          partnerKnownConstraints: c.length ? c : undefined,
-        })
-        router.push(`/r/${relationshipId}`)
+        await createRelationship({ partnerName: name.trim() })
+        router.push('/me?open=partner')
       } catch (e) {
         setErr((e as Error).message)
       }
@@ -49,24 +39,13 @@ export function NewRelationshipForm() {
           onChange={(e) => setName(e.target.value)}
           placeholder="수진"
           required
+          autoFocus
         />
-      </Card>
-      <Card>
-        <TextArea
-          label="명목 정보 — 네가 직접 아는 사실만. 자유 서술."
-          rows={8}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder={`네가 관찰해서 아는 '사실'만 적어. 관계 상태·감정·역학은 건드리지 마 — 그건 기록(Event) 쌓이면 AI가 자동 추출해.\n\n예시:\n- 27세, 마케터\n- 회사 워크샵에서 처음 봄\n- MBTI INFJ 추정\n- 외형: 짧은 단발\n- 최근 이별한 지 6개월 얘기 흘림\n- 술 잘 마심\n- 가족 언급: 동생 있음`}
-        />
-      </Card>
-      <Card>
-        <TextInput
-          label="제약/맥락 태그 (쉼표) — 중요한 경계 조건"
-          value={constraints}
-          onChange={(e) => setConstraints(e.target.value)}
-          placeholder="직장 동료, 기혼, 연하, …"
-        />
+        <div className="text-[11px] text-muted leading-relaxed mt-3">
+          이름만 넣으면 바로 생성 후 설정 탭 편집 화면으로 이동.
+          <br />
+          나이·직업·상태·목적·관계 정의·메모·제약 모두 거기서 한 곳에서 관리.
+        </div>
       </Card>
       {err && (
         <Card className="border-bad/40 bg-bad/5">
@@ -74,12 +53,8 @@ export function NewRelationshipForm() {
         </Card>
       )}
       <Button type="submit" disabled={pending || !name.trim()}>
-        {pending ? '생성 중…' : '등록'}
+        {pending ? '생성 중…' : '등록 · 편집 이어서'}
       </Button>
-      <div className="text-[11px] text-muted leading-relaxed text-center">
-        관계 진행 단계·역학(힘의 균형·연락 패턴 등)은 <span className="text-accent">Event 쌓이면 자동 추론</span>.
-        직접 설정 안 함.
-      </div>
     </form>
   )
 }

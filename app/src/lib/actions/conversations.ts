@@ -67,19 +67,34 @@ export async function appendConversationMessage(input: {
   revalidatePath('/')
 }
 
-export async function listConversations(limit = 20): Promise<
+export async function listConversations(
+  limit = 20,
+  relationshipId?: string | null
+): Promise<
   Array<{
     id: string
     title: string
     updatedAt: number
     messageCount: number
+    relationshipId: string | null
   }>
 > {
   const uid = await requireUserId()
+  const where =
+    relationshipId !== undefined
+      ? and(
+          eq(conversations.userId, uid),
+          relationshipId === null
+            ? // Drizzle isNull alternative — keep null-filter via raw check
+              eq(conversations.relationshipId, '__never__')
+            : eq(conversations.relationshipId, relationshipId)
+        )
+      : eq(conversations.userId, uid)
+
   const rows = await db
     .select()
     .from(conversations)
-    .where(eq(conversations.userId, uid))
+    .where(where)
     .orderBy(desc(conversations.updatedAt))
     .limit(limit)
   return rows.map((r) => ({
@@ -88,6 +103,7 @@ export async function listConversations(limit = 20): Promise<
     updatedAt:
       r.updatedAt instanceof Date ? r.updatedAt.getTime() : Number(r.updatedAt),
     messageCount: (r.messages ?? []).length,
+    relationshipId: r.relationshipId ?? null,
   }))
 }
 

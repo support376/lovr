@@ -17,6 +17,7 @@ type ConvMeta = {
   title: string
   updatedAt: number
   messageCount: number
+  relationshipId: string | null
 }
 
 export function LuvAIClientShell({
@@ -39,12 +40,12 @@ export function LuvAIClientShell({
     if (initialized.current) return
     initialized.current = true
     ;(async () => {
-      const items = await listConversations(20)
+      const items = await listConversations(20, relationshipId)
       setList(items)
       if (items.length > 0) {
         await loadConversation(items[0].id)
       } else {
-        const c = await createConversation({})
+        const c = await createConversation({ relationshipId })
         setConversationId(c.id)
         setMessages([])
         setList([
@@ -53,11 +54,12 @@ export function LuvAIClientShell({
             title: c.title,
             updatedAt: Date.now(),
             messageCount: 0,
+            relationshipId: c.relationshipId ?? null,
           },
         ])
       }
     })()
-  }, [])
+  }, [relationshipId])
 
   async function loadConversation(id: string) {
     const c = await getConversation(id)
@@ -70,10 +72,10 @@ export function LuvAIClientShell({
   }
 
   async function startNew() {
-    const c = await createConversation({})
+    const c = await createConversation({ relationshipId })
     setConversationId(c.id)
     setMessages([])
-    const items = await listConversations(20)
+    const items = await listConversations(20, relationshipId)
     setList(items)
     setOpenHistory(false)
   }
@@ -81,7 +83,7 @@ export function LuvAIClientShell({
   async function removeConversation(id: string) {
     if (!confirm('이 대화 삭제?')) return
     await deleteConversation(id)
-    const items = await listConversations(20)
+    const items = await listConversations(20, relationshipId)
     setList(items)
     if (conversationId === id) {
       if (items[0]) {
@@ -100,7 +102,7 @@ export function LuvAIClientShell({
         role: msg.role,
         content: msg.content,
       })
-      const items = await listConversations(20)
+      const items = await listConversations(20, relationshipId)
       setList(items)
     } catch {}
   }
