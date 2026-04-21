@@ -25,7 +25,7 @@ const items = [
   },
   {
     href: '/me',
-    label: 'MY',
+    label: '설정',
     icon: User,
     match: (p: string) => p.startsWith('/me'),
   },
