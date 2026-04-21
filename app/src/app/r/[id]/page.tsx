@@ -63,7 +63,7 @@ export default async function RelationshipProfilePage({
         <TargetSwitcher
           relationships={all}
           currentId={id}
-          buildHref={(rid) => `/r/${rid}`}
+          route={{ kind: 'path', base: '/r' }}
         />
       </div>
 

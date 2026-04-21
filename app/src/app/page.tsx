@@ -21,7 +21,7 @@ export default async function LuvAIHome() {
           <TargetSwitcher
             relationships={all}
             currentId={cur?.id ?? null}
-            buildHref={() => `/`}
+            route={{ kind: 'refresh' }}
           />
         </div>
       )}

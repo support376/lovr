@@ -83,7 +83,7 @@ export default async function StrategyDetailPage({
         <TargetSwitcher
           relationships={all}
           currentId={id}
-          buildHref={(rid) => `/s/${rid}`}
+          route={{ kind: 'path', base: '/s' }}
         />
       </div>
 

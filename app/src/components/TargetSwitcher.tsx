@@ -9,6 +9,17 @@ import { setFocusRelationship } from '@/lib/actions/focus'
 
 type RelWithPartner = Relationship & { partner: Actor }
 
+/**
+ * 라우팅 규칙 — 직렬화 가능한 값만. (server → client 경계 통과)
+ *   kind='path'    : `${base}/${id}`         e.g. /r/<id>, /s/<id>
+ *   kind='query'   : `${base}?${param}=${id}` e.g. /timeline?rel=<id>
+ *   kind='refresh' : 같은 경로로 refresh 만      e.g. AI 홈
+ */
+export type SwitcherRoute =
+  | { kind: 'path'; base: string }
+  | { kind: 'query'; base: string; param: string }
+  | { kind: 'refresh' }
+
 const STAGE_KO: Record<string, string> = {
   unknown: '판단 불가',
   observing: '관찰 중',
@@ -27,30 +38,31 @@ const STAGE_KO: Record<string, string> = {
   reconnection: '재연결',
 }
 
-/**
- * 탭 공통 상대 스위처. 가로 스크롤 snap 카드.
- *   relationships: 전체 상대 리스트
- *   currentId: 지금 선택된 상대 (active highlight)
- *   buildHref: 선택 시 이동할 URL (각 탭이 제공)
- * 카드 탭 → focus cookie 업데이트 + buildHref(id) 로 navigate.
- */
 export function TargetSwitcher({
   relationships,
   currentId,
-  buildHref,
+  route,
 }: {
   relationships: RelWithPartner[]
   currentId: string | null
-  buildHref: (id: string) => string
+  route: SwitcherRoute
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+
+  const hrefFor = (id: string): string | null => {
+    if (route.kind === 'path') return `${route.base}/${id}`
+    if (route.kind === 'query') return `${route.base}?${route.param}=${id}`
+    return null
+  }
 
   const select = (id: string) => {
     if (id === currentId || pending) return
     start(async () => {
       await setFocusRelationship(id)
-      router.push(buildHref(id))
+      const href = hrefFor(id)
+      if (href) router.push(href)
+      else router.refresh()
     })
   }
 
@@ -112,9 +124,7 @@ export function TargetSwitcher({
                   </span>
                 )}
               </div>
-              <div className="text-[10px] text-muted mt-auto">
-                {dateLabel}
-              </div>
+              <div className="text-[10px] text-muted mt-auto">{dateLabel}</div>
             </button>
           )
         })}

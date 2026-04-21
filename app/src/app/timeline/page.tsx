@@ -70,7 +70,7 @@ export default async function TimelinePage({
               <TargetSwitcher
                 relationships={all}
                 currentId={focused?.id ?? null}
-                buildHref={(id) => `/timeline?rel=${id}`}
+                route={{ kind: 'query', base: '/timeline', param: 'rel' }}
               />
             </div>
 
