@@ -23,6 +23,7 @@ import {
   MODEL_EXTRACTION_PROMPT,
   SIMULATION_PROMPT,
 } from '../prompts/model'
+import { truncateEventContent } from './context'
 
 // =============================================================================
 // Model extraction
@@ -207,6 +208,8 @@ export async function extractRelationshipModel(
     .where(and(eq(actors.userId, userId), eq(actors.role, 'self')))
     .limit(1)
 
+  // 200k context 폭주 방지 — 40개 + 이벤트당 3k자 상한.
+  // 긴 카톡 덤프는 truncateEventContent 로 head+tail 보존, 중간 생략.
   const evList = await db
     .select()
     .from(events)
@@ -214,7 +217,7 @@ export async function extractRelationshipModel(
       and(eq(events.relationshipId, relationshipId), eq(events.userId, userId))
     )
     .orderBy(desc(events.createdAt))
-    .limit(80)
+    .limit(40)
 
   if (evList.length === 0) {
     throw new Error('Event 없음 — 기록 먼저 추가해주세요.')
@@ -228,18 +231,29 @@ export async function extractRelationshipModel(
   })
 
   const client = anthropic()
-  const res = await client.messages.create({
-    model: MID_MODEL,
-    max_tokens: 2500,
-    system: [
-      {
-        type: 'text',
-        text: MODEL_EXTRACTION_PROMPT,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: userMsg }],
-  })
+  let res
+  try {
+    res = await client.messages.create({
+      model: MID_MODEL,
+      max_tokens: 2500,
+      system: [
+        {
+          type: 'text',
+          text: MODEL_EXTRACTION_PROMPT,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userMsg }],
+    })
+  } catch (e) {
+    const msg = (e as { message?: string })?.message ?? ''
+    if (msg.includes('prompt is too long')) {
+      throw new Error(
+        '이벤트 양이 너무 많아 모델 한도 초과. 기록 탭에서 긴 카톡 덤프 이벤트 몇 개 줄여봐.'
+      )
+    }
+    throw e
+  }
 
   const text = res.content
     .filter((b) => b.type === 'text')
@@ -416,7 +430,7 @@ function renderExtractionContext(c: {
       ? new Date(e.timestamp).toISOString()
       : '날짜 불명'
     lines.push(`\n### [${e.type}] ${ts}`)
-    lines.push(e.content)
+    lines.push(truncateEventContent(e.content))
   }
 
   return lines.join('\n')

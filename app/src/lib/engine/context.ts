@@ -143,9 +143,20 @@ function render(c: {
         ? new Date(e.timestamp).toISOString()
         : '날짜 불명'
       lines.push(`\n### [${e.type}] ${ts}`)
-      lines.push(e.content)
+      lines.push(truncateEventContent(e.content))
     }
   }
 
   return lines.join('\n')
+}
+
+// 토큰 폭주 방지 — 긴 카톡 덤프 이벤트는 앞뒤 잘라서 넣음.
+// 200k context 감안, 이벤트 하나당 ~3000자(≈1000토큰) 상한.
+const EVENT_CONTENT_CAP = 3000
+export function truncateEventContent(s: string): string {
+  if (!s) return ''
+  if (s.length <= EVENT_CONTENT_CAP) return s
+  const head = s.slice(0, Math.floor(EVENT_CONTENT_CAP * 0.7))
+  const tail = s.slice(-Math.floor(EVENT_CONTENT_CAP * 0.25))
+  return `${head}\n\n[...중간 ${s.length - head.length - tail.length}자 생략...]\n\n${tail}`
 }

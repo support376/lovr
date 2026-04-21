@@ -36,7 +36,9 @@
       "Bash(git restore *)",
       "Bash(git branch *)",
       "Bash(git reset *)",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(vercel alias *)",
+      "Bash(vercel logs *)"
     ]
   }
 }
