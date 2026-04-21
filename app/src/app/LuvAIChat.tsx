@@ -99,7 +99,7 @@ export function LuvAIChat({
       : ['연애 전반 고민 있어', '첫 상대 등록하고 싶은데']
 
   return (
-    <Card className="flex flex-col gap-3 flex-1 min-h-[360px]">
+    <Card className="flex flex-col gap-3 flex-1 min-h-0">
       {/* 모드 토글 */}
       {targetAlias && (
         <div className="flex items-center gap-2 shrink-0">
@@ -135,7 +135,7 @@ export function LuvAIChat({
 
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto flex flex-col gap-2 px-0.5"
+        className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 px-0.5"
       >
         {empty && (
           <>

@@ -74,7 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               aria-hidden="true"
             />
             {showNav && <TopBar />}
-            <main className="flex-1 flex flex-col overflow-y-auto safe-bottom">
+            <main className="flex-1 min-h-0 flex flex-col overflow-y-auto safe-bottom">
               {children}
             </main>
             {showNav && <BottomNav />}

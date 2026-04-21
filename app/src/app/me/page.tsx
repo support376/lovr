@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation'
 import { ChevronDown, ChevronRight, User, Heart, CreditCard, LogOut } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
-import { getCurrentRelationship } from '@/lib/actions/relationships'
+import {
+  getCurrentRelationship,
+  listRelationships,
+} from '@/lib/actions/relationships'
 import { PageHeader } from '@/components/ui'
 import { SelfForm } from './SelfForm'
 import { PartnerSettings } from './PartnerSettings'
@@ -9,8 +12,7 @@ import { BillingMock } from './Billing'
 import { SignOutButton } from './SignOutButton'
 
 /**
- * 설정 탭 — 내 정보 + 상대 정보 + 결제 + 로그아웃.
- * 단일 active target UX — 한 명 기준 모든 콘텐츠 렌더.
+ * 설정 탭 — 내 정보 + 상대 정보 (N명 관리) + 결제 + 로그아웃.
  */
 export default async function SettingsPage({
   searchParams,
@@ -20,7 +22,8 @@ export default async function SettingsPage({
   const self = await getSelf()
   if (!self) redirect('/onboarding')
 
-  const rel = await getCurrentRelationship()
+  const all = await listRelationships()
+  const current = await getCurrentRelationship()
   const sp = await searchParams
   const open = sp.open ?? 'self'
 
@@ -42,10 +45,14 @@ export default async function SettingsPage({
           id="partner"
           icon={<Heart size={14} />}
           label="상대 정보"
-          hint={rel?.partner.displayName ?? '미등록'}
+          hint={
+            all.length === 0
+              ? '미등록'
+              : `${current?.partner.displayName ?? '-'} · 전체 ${all.length}명`
+          }
           open={open === 'partner'}
         >
-          <PartnerSettings rel={rel} />
+          <PartnerSettings all={all} current={current} />
         </Section>
 
         <Section

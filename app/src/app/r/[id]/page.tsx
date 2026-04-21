@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
 import { getRelationship } from '@/lib/actions/relationships'
 import { ModelCard } from './ModelCard'
+import { CurrentTargetHeader } from '@/components/CurrentTargetHeader'
 
 /**
  * 분석 탭 — 모델만. 상대 정보·상태·목적 편집은 설정 탭에서.
@@ -20,7 +21,8 @@ export default async function RelationshipAnalysisPage({
 
   return (
     <>
-      <header className="px-5 pt-5 pb-3">
+      <CurrentTargetHeader rel={rel} />
+      <header className="px-5 pt-2 pb-3">
         <h1 className="text-2xl font-bold">분석</h1>
         <div className="text-[11px] text-muted mt-0.5">
           반응 모델 — Y = aX + b

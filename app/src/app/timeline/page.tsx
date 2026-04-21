@@ -6,6 +6,7 @@ import { listEvents } from '@/lib/actions/events'
 import { Button, Card, Empty, PageHeader } from '@/components/ui'
 import { AddEventForm } from './AddEventForm'
 import { EventCard } from './EventCard'
+import { CurrentTargetHeader } from '@/components/CurrentTargetHeader'
 
 /**
  * 기록 탭 — 현재 상대 1명 기준 대화·사건 로그. 상대 전환·프로필은 설정에서.
@@ -19,6 +20,7 @@ export default async function TimelinePage() {
 
   return (
     <>
+      <CurrentTargetHeader rel={focused} />
       <PageHeader title="기록" subtitle="대화 · 사건 · 메모" />
 
       <div className="px-5 pb-10 flex-1 flex flex-col gap-4">

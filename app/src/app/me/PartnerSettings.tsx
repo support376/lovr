@@ -3,12 +3,13 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Check } from 'lucide-react'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import {
   updatePartner,
   updateRelationship,
 } from '@/lib/actions/relationships'
+import { setFocusRelationship } from '@/lib/actions/focus'
 import {
   ALLOWED_GOALS_BY_STATE,
   GOAL_LABEL,
@@ -42,42 +43,86 @@ function toInputDate(ts: Date | number | null | undefined): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
+type RelWithPartner = Relationship & { partner: Actor }
+
 /**
- * 현재 상대 + 관계 설정 (state/goal/날짜) 한 번에.
- * 딱 1 명 active target 모드에 맞춤.
+ * 설정 탭 > 상대 정보.
+ * N 명 목록 · 현재 선택 (focus) · 추가 · 선택된 상대 편집 한 곳.
  */
 export function PartnerSettings({
-  rel,
+  all,
+  current,
 }: {
-  rel: (Relationship & { partner: Actor }) | null
+  all: RelWithPartner[]
+  current: RelWithPartner | null
 }) {
   const router = useRouter()
+  const [pendingSelect, startSelect] = useTransition()
 
-  if (!rel) {
-    return (
-      <Card>
-        <div className="flex flex-col gap-3">
-          <div className="text-[11px] text-muted leading-relaxed">
-            아직 등록된 상대가 없어. 먼저 상대 하나 추가해야 모델 분석·시뮬레이션이 돌아가.
-          </div>
-          <Link href="/r/new">
-            <Button className="w-full">
-              <Plus size={14} /> 상대 추가
-            </Button>
-          </Link>
-        </div>
-      </Card>
-    )
+  const pick = (id: string) => {
+    if (id === current?.id) return
+    startSelect(async () => {
+      await setFocusRelationship(id)
+      router.refresh()
+    })
   }
 
-  return <PartnerForm rel={rel} onSaved={() => router.refresh()} />
+  return (
+    <div className="flex flex-col gap-3">
+      {/* 스위처 + 추가 */}
+      <div className="flex gap-1.5 flex-wrap items-center">
+        {all.map((r) => {
+          const selected = r.id === current?.id
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => pick(r.id)}
+              disabled={pendingSelect}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                selected
+                  ? 'bg-accent/15 border-accent/40 text-accent'
+                  : 'bg-surface-2 border-border text-muted hover:border-accent/40'
+              } ${pendingSelect ? 'opacity-60' : ''}`}
+            >
+              {selected && <Check size={10} />}
+              {r.partner.displayName}
+              {r.partner.age ? (
+                <span className="text-muted font-normal">({r.partner.age})</span>
+              ) : null}
+            </button>
+          )
+        })}
+        <Link
+          href="/r/new"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium border border-dashed border-border text-muted hover:text-accent hover:border-accent"
+        >
+          <Plus size={11} /> 추가
+        </Link>
+      </div>
+
+      {!current ? (
+        <Card>
+          <div className="text-[11px] text-muted leading-relaxed">
+            아직 등록된 상대가 없어. 위 <strong>추가</strong> 버튼으로 첫 상대 등록.
+          </div>
+        </Card>
+      ) : (
+        <PartnerForm
+          key={current.id}
+          rel={current}
+          onSaved={() => router.refresh()}
+        />
+      )}
+    </div>
+  )
 }
 
 function PartnerForm({
   rel,
   onSaved,
 }: {
-  rel: Relationship & { partner: Actor }
+  rel: RelWithPartner
   onSaved: () => void
 }) {
   const [name, setName] = useState(rel.partner.displayName)
@@ -191,7 +236,7 @@ function PartnerForm({
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">관계</div>
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-muted uppercase tracking-wider">
               상태
             </span>
@@ -211,9 +256,9 @@ function PartnerForm({
                 </button>
               ))}
             </div>
-          </label>
+          </div>
 
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className="text-[10px] text-muted uppercase tracking-wider">
               목적
             </span>
@@ -242,7 +287,7 @@ function PartnerForm({
                 </button>
               )}
             </div>
-          </label>
+          </div>
 
           <TextInput
             label="관계 정의 (한 줄)"

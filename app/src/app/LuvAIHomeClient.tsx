@@ -183,7 +183,7 @@ export function LuvAIClientShell({
         </div>
       )}
 
-      <div className="px-5 pb-8 flex-1 flex flex-col">
+      <div className="px-5 pb-5 flex-1 min-h-0 flex flex-col">
         <LuvAIChat
           targetAlias={targetAlias}
           relationshipId={relationshipId}
