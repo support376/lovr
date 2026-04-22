@@ -48,9 +48,6 @@ export function PartnerInlineEditor({
   const [gender, setGender] = useState(rel.partner.gender ?? '')
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
-  const [constraintsText, setConstraintsText] = useState(
-    (rel.partner.knownConstraints ?? []).join(', ')
-  )
 
   const [firstMet, setFirstMet] = useState(dateInputValue(rel.timelineStart))
 
@@ -68,10 +65,6 @@ export function PartnerInlineEditor({
           gender: gender || null,
           occupation: occupation.trim() || null,
           rawNotes: rawNotes.trim() || null,
-          knownConstraints: constraintsText
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
         })
         setMsg('저장됨')
         setOpen(false)
@@ -89,8 +82,6 @@ export function PartnerInlineEditor({
           : Number(rel.timelineStart)
       ).toLocaleDateString('ko-KR')
     : null
-  const constraintList = rel.partner.knownConstraints ?? []
-
   const summary = (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline gap-2 flex-wrap">
@@ -102,13 +93,12 @@ export function PartnerInlineEditor({
           <span className="text-[11px] text-muted">· {rel.partner.occupation}</span>
         )}
       </div>
-      {(firstMetDisplay || constraintList.length > 0 || rel.description) && (
+      {(firstMetDisplay || rel.description) && (
         <div className="flex flex-col gap-0.5 text-[11px] text-muted leading-relaxed">
           {firstMetDisplay && <div>📅 첫 만남 {firstMetDisplay}</div>}
           {rel.description && (
             <div className="whitespace-pre-wrap">💬 {rel.description}</div>
           )}
-          {constraintList.length > 0 && <div>🏷 {constraintList.join(' · ')}</div>}
         </div>
       )}
     </div>
@@ -173,24 +163,12 @@ export function PartnerInlineEditor({
         />
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted uppercase tracking-wider">
-          제약 · 맥락 태그 (쉼표)
-        </span>
-        <input
-          value={constraintsText}
-          onChange={(e) => setConstraintsText(e.target.value)}
-          placeholder="기혼, 직장 동료, 연하"
-          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
-        />
-      </label>
-
       <TextArea
-        label="상대 메모 (fact)"
+        label="상대 메모"
         rows={5}
         value={rawNotes}
         onChange={(e) => setRawNotes(e.target.value)}
-        placeholder="배경·가족·공통 접점·과거 이력 등 객관 사실"
+        placeholder="배경·가족·공통 접점·과거 이력 등 객관 사실. 기혼·직장동료 같은 제약도 여기 한 줄로."
       />
 
       {msg && <div className="text-xs text-muted text-center">{msg}</div>}

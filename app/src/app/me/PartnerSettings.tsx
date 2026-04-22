@@ -144,9 +144,6 @@ function PartnerForm({
   const [gender, setGender] = useState(rel.partner.gender ?? '')
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
-  const [constraintsText, setConstraintsText] = useState(
-    (rel.partner.knownConstraints ?? []).join(', ')
-  )
   const [state, setStateValue] = useState<RelationshipState>(
     (rel.state as RelationshipState) ?? 'exploring'
   )
@@ -174,10 +171,6 @@ function PartnerForm({
           gender: gender || null,
           occupation: occupation.trim() || null,
           rawNotes: rawNotes.trim() || null,
-          knownConstraints: constraintsText
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
         })
         setMsg('저장됨')
         onSaved()
@@ -294,23 +287,14 @@ function PartnerForm({
 
       <Card>
         <div className="text-xs text-muted uppercase tracking-wider mb-2">
-          상세
+          메모
         </div>
-        <div className="flex flex-col gap-3">
-          <TextInput
-            label="제약 태그 (쉼표)"
-            value={constraintsText}
-            onChange={(e) => setConstraintsText(e.target.value)}
-            placeholder="기혼, 직장 동료, 연하"
-          />
-          <TextArea
-            label="메모 (fact)"
-            rows={5}
-            value={rawNotes}
-            onChange={(e) => setRawNotes(e.target.value)}
-            placeholder="배경·가족·공통 접점·과거 이력 등 객관 사실"
-          />
-        </div>
+        <TextArea
+          rows={5}
+          value={rawNotes}
+          onChange={(e) => setRawNotes(e.target.value)}
+          placeholder="배경·가족·공통 접점·과거 이력 등 객관 사실. 기혼·직장동료 같은 제약도 여기 한 줄로."
+        />
       </Card>
 
       {msg && <div className="text-xs text-muted text-center">{msg}</div>}
