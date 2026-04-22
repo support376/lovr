@@ -14,6 +14,7 @@ import {
   type RelationshipGoal,
 } from '../db/schema'
 import { formatModel } from './model'
+import { deriveGoal, STATE_TO_DIRECTIVE } from './auto_goal'
 
 export type RenderedContext = {
   markdown: string
@@ -109,15 +110,16 @@ function render(c: {
 
   if (c.relationship) {
     const rel = c.relationship
+    const state = rel.state as RelationshipState
+    const effectiveGoal = deriveGoal(state, (rel.goal as RelationshipGoal | null) ?? null)
     lines.push('\n## [관계 맥락]')
     lines.push(
-      `- state: ${rel.state} (${STATE_LABEL[rel.state as RelationshipState] ?? rel.state})`
+      `- state: ${rel.state} (${STATE_LABEL[state] ?? rel.state})`
     )
-    if (rel.goal) {
-      lines.push(
-        `- goal: ${rel.goal} (${GOAL_LABEL[rel.goal as RelationshipGoal] ?? rel.goal})`
-      )
-    }
+    lines.push(
+      `- goal: ${effectiveGoal} (${GOAL_LABEL[effectiveGoal] ?? effectiveGoal})${rel.goal ? '' : ' [상태에서 자동 도출]'}`
+    )
+    lines.push(`- 루바이 지령: ${STATE_TO_DIRECTIVE[state]}`)
     if (rel.description) lines.push(`- 관계: ${rel.description}`)
     if (rel.timelineStart)
       lines.push(`- 첫 만남: ${new Date(rel.timelineStart).toISOString().slice(0, 10)}`)
@@ -128,8 +130,8 @@ function render(c: {
       lines.push('\n' + formatModel(
         rel.model,
         c.partner?.displayName ?? '상대',
-        rel.state as RelationshipState,
-        (rel.goal as RelationshipGoal | null) ?? null
+        state,
+        effectiveGoal
       ))
     }
   }

@@ -3,7 +3,7 @@
 import 'server-only'
 import { anthropic, FAST_MODEL } from '../ai/client'
 import { buildContext } from '../engine/context'
-import { realtimeCorePrompt } from '../prompts/loader'
+import { luvaiCorePrompt } from '../prompts/loader'
 import { getCurrentRelationship } from './relationships'
 import { requireUserId } from '../supabase/server'
 
@@ -26,7 +26,7 @@ export async function askLuvAI(history: LuvAIMessage[]): Promise<{
     ? (await buildContext(uid, cur.id, 12)).markdown
     : '(현재 활성 관계 없음. 관계·상대 아직 등록 안 함.)'
 
-  const system = `${realtimeCorePrompt()}
+  const system = `${luvaiCorePrompt()}
 
 ---
 
