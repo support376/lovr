@@ -8,8 +8,8 @@ import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import { type RelationshipState } from '@/lib/db/schema'
 
 const GENDER_OPTIONS: Array<{ v: 'male' | 'female'; l: string }> = [
-  { v: 'male', l: '남자' },
-  { v: 'female', l: '여자' },
+  { v: 'male', l: '남성' },
+  { v: 'female', l: '여성' },
 ]
 
 // 온보딩에서 노출하는 4개 상태. struggling 은 /me 에서만 변경 가능.
