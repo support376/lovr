@@ -3,6 +3,7 @@ import { getSelf } from '@/lib/actions/self'
 import { getCurrentRelationship } from '@/lib/actions/relationships'
 import { listConversations } from '@/lib/actions/conversations'
 import { listEvents } from '@/lib/actions/events'
+import { generateOpeningMessage } from '@/lib/actions/luvai'
 import { currentUserId } from '@/lib/supabase/server'
 import { Landing } from '@/components/Landing'
 import { CurrentTargetHeader } from '@/components/CurrentTargetHeader'
@@ -51,6 +52,9 @@ export default async function LuvAIHome() {
     )
     const archives = archivesRes.ok ? archivesRes.items : []
 
+    // 루바이 선제 발화 — 활성 관계 있을 때만 (events 게이트 통과한 상태).
+    const opening = cur ? await generateOpeningMessage().catch(() => null) : null
+
     return (
       <>
         <CurrentTargetHeader rel={cur} />
@@ -59,6 +63,7 @@ export default async function LuvAIHome() {
             relationshipId={relationshipId}
             modelUpdatedAt={modelUpdatedAt}
             archives={archives}
+            initialOpeningMessage={opening}
           />
         </div>
       </>

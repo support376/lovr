@@ -30,12 +30,18 @@ export function LuvAIChat({
   relationshipId,
   modelUpdatedAt,
   archives: initialArchives,
+  initialOpeningMessage,
 }: {
   relationshipId: string | null
   modelUpdatedAt: number | null
   archives: Archive[]
+  initialOpeningMessage?: string | null
 }) {
-  const [messages, setMessages] = useState<LuvAIMessage[]>([])
+  const [messages, setMessages] = useState<LuvAIMessage[]>(
+    initialOpeningMessage
+      ? [{ role: 'assistant', content: initialOpeningMessage }]
+      : []
+  )
   const [input, setInput] = useState('')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +96,11 @@ export function LuvAIChat({
   }
 
   const reset = () => {
-    setMessages([])
+    setMessages(
+      initialOpeningMessage
+        ? [{ role: 'assistant', content: initialOpeningMessage }]
+        : []
+    )
     setError(null)
     setAnalysisBanner(false)
     sessionStartModelAtRef.current = modelUpdatedAt
