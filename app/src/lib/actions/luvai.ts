@@ -126,7 +126,7 @@ export async function askLuvAI(history: LuvAIMessage[]): Promise<{
       system,
       initialMessages,
       toolCtx,
-      maxTokens: 800,
+      maxTokens: 400,
     })
     return { reply, partnerName: cur?.partner.displayName ?? null }
   } catch (e) {
@@ -156,17 +156,17 @@ export async function generateOpeningMessage(): Promise<string | null> {
       {
         role: 'user',
         content:
-          '[시스템 트리거: 첫 진입] 루바이, 처음 만나는 거야. ' +
-          '사용자 기록 보고 첫 마디 한 번 줘. ' +
-          '자기소개 한 줄("난 너의 연애 코치 루바이야. 언제나 네 편에서 도와줄게.") 으로 시작하고, ' +
-          '그 다음 4박자 구조(이름+공감 → 솔직히 말할게 → 액션+시간 → 약속) 로 이어가.',
+          '[시스템 트리거: 첫 진입] 루바이, 첫 인사야. ' +
+          '사용자 기록 보고 2~3문장으로 짧게 쳐. ' +
+          '자기소개 1줄("나는 너의 연애 코치 루바이야. 같이 가자.") + ' +
+          '2박자(이름+상황 한 줄 → 지금 할 행동+시간). 길게 쓰지 마.',
       },
     ]
 
     const client = anthropic()
     const res = await client.messages.create({
       model: FAST_MODEL,
-      max_tokens: 600,
+      max_tokens: 300,
       system: [
         { type: 'text', text: system, cache_control: { type: 'ephemeral' } },
       ],
