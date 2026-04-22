@@ -12,11 +12,11 @@ const GENDER_OPTIONS: Array<{ v: 'male' | 'female'; l: string }> = [
   { v: 'female', l: '여성' },
 ]
 
-// 4개 상태 노출. struggling 은 /me 에서만.
+// 4개 상태 노출. serious(장기·결혼) 은 /me 에서만.
 const STATE_OPTIONS: RelationshipState[] = [
   'exploring',
   'dating',
-  'serious',
+  'struggling',
   'ended',
 ]
 
