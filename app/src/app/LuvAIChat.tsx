@@ -21,12 +21,33 @@ type Archive = {
 }
 
 /**
- * 홈 AI 채팅 — 메모리 전용. 한 세션 = 한 대화.
+ * 홈 AI 채팅 — localStorage 자동 저장.
+ * - 탭 이동·새로고침 시 메시지 복구 (relationshipId 별 key).
  * - 저장 버튼: 현재 세션 통째로 archiveChat 으로 conversations 테이블에 박음.
- * - 리셋: 저장 안 하고 날림.
+ * - 리셋: 저장 안 하고 localStorage + state 비움.
  * - 분석 업데이트 감지 (modelUpdatedAt 변화): "저장하고 리셋" 배너.
  * - 하단 이전 대화 리스트: 클릭 시 읽기전용 뷰. 삭제 가능.
  */
+function storageKey(relId: string | null) {
+  return `luvai-session:${relId ?? 'none'}`
+}
+
+function loadStored(relId: string | null): LuvAIMessage[] | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(storageKey(relId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    return parsed.filter(
+      (m): m is LuvAIMessage =>
+        m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
+    )
+  } catch {
+    return null
+  }
+}
+
 export function LuvAIChat({
   relationshipId,
   modelUpdatedAt,
@@ -38,11 +59,14 @@ export function LuvAIChat({
   archives: Archive[]
   initialOpeningMessage?: string | null
 }) {
-  const [messages, setMessages] = useState<LuvAIMessage[]>(
-    initialOpeningMessage
+  // localStorage 있으면 그거 우선. 없으면 server opening. 둘 다 없으면 빈 배열.
+  const [messages, setMessages] = useState<LuvAIMessage[]>(() => {
+    const stored = loadStored(relationshipId)
+    if (stored && stored.length > 0) return stored
+    return initialOpeningMessage
       ? [{ role: 'assistant', content: initialOpeningMessage }]
       : []
-  )
+  })
   const [input, setInput] = useState('')
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -77,6 +101,20 @@ export function LuvAIChat({
       behavior: 'smooth',
     })
   }, [messages, pending])
+
+  // messages 바뀔 때마다 localStorage 자동 저장. relationshipId 바뀌면 새 key.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem(storageKey(relationshipId))
+      } else {
+        localStorage.setItem(storageKey(relationshipId), JSON.stringify(messages))
+      }
+    } catch {
+      // quota exceeded 등 — 조용히 무시
+    }
+  }, [messages, relationshipId])
 
   const submit = () => {
     const text = input.trim()
