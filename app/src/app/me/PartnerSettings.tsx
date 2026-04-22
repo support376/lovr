@@ -11,23 +11,13 @@ import {
 } from '@/lib/actions/relationships'
 import { setFocusRelationship } from '@/lib/actions/focus'
 import {
-  ALLOWED_GOALS_BY_STATE,
-  GOAL_LABEL,
   STATE_LABEL,
   type Actor,
   type Relationship,
-  type RelationshipGoal,
   type RelationshipState,
 } from '@/lib/db/schema'
 import { usePlan } from '@/lib/plan'
 import { UpgradeGate } from '@/components/UpgradeGate'
-
-const GENDER = [
-  { v: '', l: '-' },
-  { v: 'male', l: '남' },
-  { v: 'female', l: '여' },
-  { v: 'other', l: '기타' },
-]
 
 const STATES: RelationshipState[] = [
   'exploring',
@@ -145,7 +135,6 @@ function PartnerForm({
 }) {
   const [name, setName] = useState(rel.partner.displayName)
   const [age, setAge] = useState(rel.partner.age?.toString() ?? '')
-  const [gender, setGender] = useState(rel.partner.gender ?? '')
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
   const [constraintsText, setConstraintsText] = useState(
@@ -154,9 +143,6 @@ function PartnerForm({
   const [state, setStateValue] = useState<RelationshipState>(
     (rel.state as RelationshipState) ?? 'exploring'
   )
-  const [goal, setGoal] = useState<RelationshipGoal | null>(
-    (rel.goal as RelationshipGoal | null) ?? null
-  )
   const [description, setDescription] = useState(rel.description ?? '')
   const [firstMet, setFirstMet] = useState(toInputDate(rel.timelineStart))
   const [endedAt, setEndedAt] = useState(toInputDate(rel.timelineEnd))
@@ -164,14 +150,8 @@ function PartnerForm({
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
 
-  const allowedGoals = ALLOWED_GOALS_BY_STATE[state]
-
-  const pickState = (s: RelationshipState) => {
-    setStateValue(s)
-    if (goal && !ALLOWED_GOALS_BY_STATE[s].includes(goal)) {
-      setGoal(null)
-    }
-  }
+  // goal 은 상태에서 자동 도출 (lib/engine/auto_goal.ts) — UI 노출 안 함.
+  // 상대 gender 도 온보딩 시 내 성별 반대로 고정됨 — UI 노출 안 함.
 
   const submit = () => {
     setMsg(null)
@@ -179,7 +159,6 @@ function PartnerForm({
       try {
         await updateRelationship(rel.id, {
           state,
-          goal,
           description: description.trim() || null,
           timelineStart: firstMet ? new Date(firstMet + 'T00:00:00') : null,
           timelineEnd: endedAt ? new Date(endedAt + 'T00:00:00') : null,
@@ -187,7 +166,6 @@ function PartnerForm({
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
           age: age ? parseInt(age, 10) : null,
-          gender: gender || null,
           occupation: occupation.trim() || null,
           rawNotes: rawNotes.trim() || null,
           knownConstraints: constraintsText
@@ -219,7 +197,7 @@ function PartnerForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <TextInput
               label="나이"
               value={age}
@@ -227,20 +205,6 @@ function PartnerForm({
               inputMode="numeric"
               placeholder="27"
             />
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted">성별</span>
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="rounded-xl bg-surface-2 border border-border px-2 py-3 text-sm outline-none focus:border-accent"
-              >
-                {GENDER.map((o) => (
-                  <option key={o.v} value={o.v}>
-                    {o.l}
-                  </option>
-                ))}
-              </select>
-            </label>
             <TextInput
               label="직업"
               value={occupation}
@@ -263,7 +227,7 @@ function PartnerForm({
                 <button
                   key={s}
                   type="button"
-                  onClick={() => pickState(s)}
+                  onClick={() => setStateValue(s)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-medium border ${
                     state === s
                       ? 'bg-accent/15 border-accent/50 text-accent'
@@ -274,37 +238,9 @@ function PartnerForm({
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider">
-              목적
+            <span className="text-[10px] text-muted">
+              목표는 상태에서 자동 결정 — 루바이가 알아서 잡아.
             </span>
-            <div className="flex gap-1 flex-wrap">
-              {allowedGoals.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setGoal(g)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                    goal === g
-                      ? 'bg-accent-2/15 border-accent-2/50 text-accent-2'
-                      : 'bg-surface-2 border-border text-muted'
-                  }`}
-                >
-                  {GOAL_LABEL[g]}
-                </button>
-              ))}
-              {goal && (
-                <button
-                  type="button"
-                  onClick={() => setGoal(null)}
-                  className="px-2 py-1 text-[10px] text-muted hover:text-bad"
-                >
-                  ✕ 해제
-                </button>
-              )}
-            </div>
           </div>
 
           <TextInput

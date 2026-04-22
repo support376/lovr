@@ -78,6 +78,19 @@ export async function createRelationship(input: {
 }): Promise<{ relationshipId: string; partnerId: string }> {
   const uid = await requireUserId()
 
+  // self.gender 의 반대를 상대 성별로 자동 — 추가 관계도 일관성 유지.
+  const [self] = await db
+    .select({ gender: actors.gender })
+    .from(actors)
+    .where(and(eq(actors.userId, uid), eq(actors.role, 'self')))
+    .limit(1)
+  const partnerGender =
+    self?.gender === 'male'
+      ? 'female'
+      : self?.gender === 'female'
+        ? 'male'
+        : null
+
   const partnerId = `actor-${randomUUID()}`
   const relId = `rel-${randomUUID()}`
 
@@ -86,6 +99,7 @@ export async function createRelationship(input: {
     userId: uid,
     role: 'partner',
     displayName: input.partnerName,
+    gender: partnerGender,
     rawNotes: input.partnerRawNotes ?? null,
     knownConstraints: input.partnerKnownConstraints ?? [],
   })

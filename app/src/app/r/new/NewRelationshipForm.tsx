@@ -44,7 +44,7 @@ export function NewRelationshipForm() {
         <div className="text-[11px] text-muted leading-relaxed mt-3">
           이름만 넣으면 바로 생성 후 설정 탭 편집 화면으로 이동.
           <br />
-          나이·직업·상태·목적·관계 정의·메모·제약 모두 거기서 한 곳에서 관리.
+          상대 성별은 내 성별 반대로 자동. 나이·직업·상태·메모는 거기서 채워.
         </div>
       </Card>
       {err && (
