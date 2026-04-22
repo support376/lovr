@@ -52,7 +52,6 @@ export function PartnerInlineEditor({
     (rel.partner.knownConstraints ?? []).join(', ')
   )
 
-  const [description, setDescription] = useState(rel.description ?? '')
   const [firstMet, setFirstMet] = useState(dateInputValue(rel.timelineStart))
 
   const submit = () => {
@@ -61,7 +60,6 @@ export function PartnerInlineEditor({
       try {
         const timelineStart = firstMet ? new Date(firstMet + 'T00:00:00') : null
         await updateRelationship(rel.id, {
-          description: description.trim() || null,
           timelineStart,
         } as never)
         await updatePartner(rel.partner.id, {
@@ -171,18 +169,6 @@ export function PartnerInlineEditor({
           type="date"
           value={firstMet}
           onChange={(e) => setFirstMet(e.target.value)}
-          className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-[10px] text-muted uppercase tracking-wider">
-          관계 정의 (한 줄)
-        </span>
-        <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="직장 후임 · 소개팅 3회차"
           className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
         />
       </label>

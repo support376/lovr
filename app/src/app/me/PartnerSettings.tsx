@@ -11,12 +11,9 @@ import {
 } from '@/lib/actions/relationships'
 import { setFocusRelationship } from '@/lib/actions/focus'
 import {
-  ALLOWED_GOALS_BY_STATE,
-  GOAL_LABEL,
   STATE_LABEL,
   type Actor,
   type Relationship,
-  type RelationshipGoal,
   type RelationshipState,
 } from '@/lib/db/schema'
 import { usePlan } from '@/lib/plan'
@@ -153,24 +150,14 @@ function PartnerForm({
   const [state, setStateValue] = useState<RelationshipState>(
     (rel.state as RelationshipState) ?? 'exploring'
   )
-  const [goal, setGoal] = useState<RelationshipGoal | null>(
-    (rel.goal as RelationshipGoal | null) ?? null
-  )
-  const [description, setDescription] = useState(rel.description ?? '')
   const [firstMet, setFirstMet] = useState(toInputDate(rel.timelineStart))
   const [endedAt, setEndedAt] = useState(toInputDate(rel.timelineEnd))
 
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
 
-  const allowedGoals = ALLOWED_GOALS_BY_STATE[state]
-
-  const pickState = (s: RelationshipState) => {
-    setStateValue(s)
-    if (goal && !ALLOWED_GOALS_BY_STATE[s].includes(goal)) {
-      setGoal(null)
-    }
-  }
+  // 종료일은 ended / struggling 상태에서만 의미
+  const showEndedAt = state === 'ended' || state === 'struggling'
 
   const submit = () => {
     setMsg(null)
@@ -178,10 +165,8 @@ function PartnerForm({
       try {
         await updateRelationship(rel.id, {
           state,
-          goal,
-          description: description.trim() || null,
           timelineStart: firstMet ? new Date(firstMet + 'T00:00:00') : null,
-          timelineEnd: endedAt ? new Date(endedAt + 'T00:00:00') : null,
+          timelineEnd: showEndedAt && endedAt ? new Date(endedAt + 'T00:00:00') : null,
         } as never)
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
@@ -262,7 +247,7 @@ function PartnerForm({
                 <button
                   key={s}
                   type="button"
-                  onClick={() => pickState(s)}
+                  onClick={() => setStateValue(s)}
                   className={`px-2.5 py-1 rounded-full text-[11px] font-medium border ${
                     state === s
                       ? 'bg-accent/15 border-accent/50 text-accent'
@@ -273,47 +258,12 @@ function PartnerForm({
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10px] text-muted uppercase tracking-wider">
-              목적
+            <span className="text-[10px] text-muted">
+              목표는 상태에서 자동 결정 — 루바이가 알아서.
             </span>
-            <div className="flex gap-1 flex-wrap">
-              {allowedGoals.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => setGoal(g)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                    goal === g
-                      ? 'bg-accent-2/15 border-accent-2/50 text-accent-2'
-                      : 'bg-surface-2 border-border text-muted'
-                  }`}
-                >
-                  {GOAL_LABEL[g]}
-                </button>
-              ))}
-              {goal && (
-                <button
-                  type="button"
-                  onClick={() => setGoal(null)}
-                  className="px-2 py-1 text-[10px] text-muted hover:text-bad"
-                >
-                  ✕ 해제
-                </button>
-              )}
-            </div>
           </div>
 
-          <TextInput
-            label="관계 정의 (한 줄)"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="직장 후임 · 소개팅 3회차"
-          />
-
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid ${showEndedAt ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
             <label className="flex flex-col gap-1">
               <span className="text-[10px] text-muted uppercase tracking-wider">
                 첫 만남
@@ -325,17 +275,19 @@ function PartnerForm({
                 className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
               />
             </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10px] text-muted uppercase tracking-wider">
-                종료일 (해당 시)
-              </span>
-              <input
-                type="date"
-                value={endedAt}
-                onChange={(e) => setEndedAt(e.target.value)}
-                className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
-              />
-            </label>
+            {showEndedAt && (
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] text-muted uppercase tracking-wider">
+                  종료일
+                </span>
+                <input
+                  type="date"
+                  value={endedAt}
+                  onChange={(e) => setEndedAt(e.target.value)}
+                  className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
+                />
+              </label>
+            )}
           </div>
         </div>
       </Card>
