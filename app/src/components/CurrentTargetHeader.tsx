@@ -10,7 +10,7 @@ import {
 } from '@/lib/db/schema'
 
 /**
- * AI·기록·분석 상단 공통 — 현재 대상 + 상태 + 목적 + 신뢰도.
+ * AI·기록·분석 상단 공통 — 현재 대상 + 상태 + 목적.
  * 읽기 전용. 탭하면 설정 탭으로 점프.
  */
 export function CurrentTargetHeader({
@@ -18,9 +18,18 @@ export function CurrentTargetHeader({
 }: {
   rel: (Relationship & { partner: Actor }) | null
 }) {
-  // rel 없으면 헤더 숨김 — "상대 등록" 은 필수 조건 아님.
-  // 홈 서버 컴포넌트가 ensureDefaultRelationship 으로 복구함.
-  if (!rel) return null
+  if (!rel) {
+    return (
+      <div className="px-5 pt-3 pb-2">
+        <Link
+          href="/me?open=partner"
+          className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-dashed border-border text-muted hover:border-accent/40 hover:text-accent"
+        >
+          <Settings size={11} /> 상대 등록 안 됨 · 설정에서 추가
+        </Link>
+      </div>
+    )
+  }
 
   const stateLabel =
     STATE_LABEL[rel.state as RelationshipState] ?? rel.state
@@ -28,27 +37,8 @@ export function CurrentTargetHeader({
     ? GOAL_LABEL[rel.goal as RelationshipGoal] ?? rel.goal
     : null
 
-  // 신뢰도 — 상대 명목 정보 4필드 중 채워진 개수.
-  // '상대' placeholder 이름은 미채움 간주.
-  const partnerIsPlaceholder = rel.partner.displayName === '상대'
-  const partnerFields = [
-    partnerIsPlaceholder ? 0 : 1,
-    rel.partner.age ? 1 : 0,
-    rel.partner.occupation ? 1 : 0,
-    rel.partner.rawNotes && rel.partner.rawNotes.length > 10 ? 1 : 0,
-  ]
-  const filled = partnerFields.reduce((a, b) => a + b, 0)
-  const pct = Math.round((filled / partnerFields.length) * 100)
-
-  const missing: string[] = []
-  if (partnerIsPlaceholder) missing.push('상대 이름')
-  if (!rel.partner.age) missing.push('나이')
-  if (!rel.partner.occupation) missing.push('직업')
-  if (!rel.partner.rawNotes || rel.partner.rawNotes.length <= 10)
-    missing.push('상대 메모')
-
   return (
-    <div className="px-5 pt-3 pb-2 flex flex-col gap-1.5">
+    <div className="px-5 pt-3 pb-2">
       <Link
         href="/me?open=partner"
         className="inline-flex items-center gap-1.5 text-[11px] hover:opacity-80"
@@ -71,28 +61,6 @@ export function CurrentTargetHeader({
         )}
         <Settings size={10} className="text-muted ml-0.5" />
       </Link>
-
-      {pct < 100 && (
-        <Link
-          href="/me?open=partner"
-          className="flex items-center gap-2 text-[10px] text-muted hover:text-accent"
-        >
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="w-16 h-1 rounded-full bg-surface-2 overflow-hidden">
-              <div
-                className="h-full bg-accent/60 transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="tabular-nums">{pct}%</span>
-          </div>
-          <span className="truncate">
-            {pct === 0
-              ? '정보 더 주면 루바이가 더 정확해져'
-              : `더 정확해지려면 · ${missing.slice(0, 2).join(' · ')}`}
-          </span>
-        </Link>
-      )}
     </div>
   )
 }

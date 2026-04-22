@@ -6,26 +6,24 @@ import { Button, Card, TextArea, TextInput } from '@/components/ui'
 import { updateSelf } from '@/lib/actions/self'
 import type { Actor } from '@/lib/db/schema'
 
+const GENDER = [
+  { v: 'male', l: '남' },
+  { v: 'female', l: '여' },
+]
+
 /**
- * MY 프로필 — 명목 fact 만.
- * 성별은 온보딩에서 확정 — 여기서 수정 안 함 (표시만).
+ * MY 프로필 — 명목 fact 만. 자가진단·자산·지출 없음.
  */
 export function SelfForm({ initial }: { initial: Actor }) {
   const [name, setName] = useState(initial.displayName)
   const [age, setAge] = useState(initial.age?.toString() ?? '')
+  const [gender, setGender] = useState(initial.gender ?? '')
   const [occupation, setOccupation] = useState(initial.occupation ?? '')
   const [rawNotes, setRawNotes] = useState(initial.rawNotes ?? '')
 
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<string | null>(null)
   const router = useRouter()
-
-  const genderLabel =
-    initial.gender === 'male'
-      ? '남성'
-      : initial.gender === 'female'
-        ? '여성'
-        : '—'
 
   const submit = () => {
     setMsg(null)
@@ -34,6 +32,7 @@ export function SelfForm({ initial }: { initial: Actor }) {
         await updateSelf({
           displayName: name.trim() || undefined,
           age: age ? parseInt(age, 10) : null,
+          gender: gender || null,
           occupation: occupation.trim() || null,
           rawNotes: rawNotes.trim() || null,
         })
@@ -69,12 +68,21 @@ export function SelfForm({ initial }: { initial: Actor }) {
               inputMode="numeric"
               placeholder="30"
             />
-            <div className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-1.5">
               <span className="text-xs text-muted">성별</span>
-              <div className="rounded-xl bg-surface-2 border border-border px-3 py-3 text-sm text-muted">
-                {genderLabel}
-              </div>
-            </div>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                className="rounded-xl bg-surface-2 border border-border px-2 py-3 text-sm outline-none focus:border-accent"
+              >
+                <option value="">-</option>
+                {GENDER.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.l}
+                  </option>
+                ))}
+              </select>
+            </label>
             <TextInput
               label="직업"
               value={occupation}

@@ -1,11 +1,6 @@
-import { redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
-import {
-  ensureDefaultRelationship,
-  getCurrentRelationship,
-} from '@/lib/actions/relationships'
+import { getCurrentRelationship } from '@/lib/actions/relationships'
 import { listConversations } from '@/lib/actions/conversations'
-import { listEvents } from '@/lib/actions/events'
 import { generateOpeningMessage } from '@/lib/actions/luvai'
 import { currentUserId } from '@/lib/supabase/server'
 import { Landing } from '@/components/Landing'
@@ -41,23 +36,6 @@ export default async function LuvAIHome() {
       console.error('[LuvAIHome getCurrentRelationship]', e)
     }
 
-    // self 있는데 relationship 없으면 자동 복구 (기존 유저 포함).
-    // "상대 등록" 은 사용자가 명시적으로 할 조건 아님 — 자동.
-    if (!cur) {
-      try {
-        const newRelId = await ensureDefaultRelationship()
-        if (newRelId) cur = await getCurrentRelationship()
-      } catch (e) {
-        console.error('[LuvAIHome ensureDefaultRelationship]', e)
-      }
-    }
-
-    // 첫 기록 게이트 — 활성 관계 있는데 events 0 건이면 first-event 로.
-    if (cur) {
-      const seedCheck = await listEvents(cur.id, 1).catch(() => [])
-      if (seedCheck.length === 0) redirect('/onboarding/first-event')
-    }
-
     const relationshipId = cur?.id ?? null
     const modelUpdatedAt = cur?.model?.updatedAt ?? null
 
@@ -66,7 +44,7 @@ export default async function LuvAIHome() {
     )
     const archives = archivesRes.ok ? archivesRes.items : []
 
-    // 루바이 선제 발화 — 활성 관계 있을 때만 (events 게이트 통과한 상태).
+    // 루바이 선제 발화 — 활성 관계 있을 때만.
     const opening = cur ? await generateOpeningMessage().catch(() => null) : null
 
     return (
@@ -83,8 +61,6 @@ export default async function LuvAIHome() {
       </>
     )
   } catch (e) {
-    // Next.js redirect() throws — let it bubble up.
-    if ((e as { digest?: string })?.digest?.startsWith('NEXT_REDIRECT')) throw e
     console.error('[LuvAIHome render]', e)
     return (
       <div className="p-5 text-sm">

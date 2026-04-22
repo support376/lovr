@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { BottomNav } from '@/components/BottomNav'
 import { TopBar } from '@/components/TopBar'
+import { FirstSetupModal } from '@/components/FirstSetupModal'
 import { getSelf } from '@/lib/actions/self'
+import { getCurrentRelationship } from '@/lib/actions/relationships'
+import { listEvents } from '@/lib/actions/events'
 
 export const metadata: Metadata = {
   title: 'LuvOS',
@@ -30,6 +33,29 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const self = await getSelf().catch(() => null)
   const showNav = !!self
+
+  // 첫 설정 모달 — self 있는데 gender/rel/event 중 하나라도 없으면 오버레이.
+  // 미로그인·온보딩 미완료 유저는 self null 이라 자동으로 안 뜸.
+  let needsGender = false
+  let needsRelationship = false
+  let needsFirstEvent = false
+  let existingRelId: string | null = null
+
+  if (self) {
+    needsGender = !self.gender
+    const cur = await getCurrentRelationship().catch(() => null)
+    if (cur) {
+      existingRelId = cur.id
+      const seed = await listEvents(cur.id, 1).catch(() => [])
+      needsFirstEvent = seed.length === 0
+    } else {
+      needsRelationship = true
+      needsFirstEvent = true
+    }
+  }
+
+  const showSetupModal =
+    !!self && (needsGender || needsRelationship || needsFirstEvent)
 
   return (
     <html lang="ko">
@@ -78,6 +104,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {children}
             </main>
             {showNav && <BottomNav />}
+            {showSetupModal && (
+              <FirstSetupModal
+                needsGender={needsGender}
+                needsRelationship={needsRelationship}
+                needsFirstEvent={needsFirstEvent}
+                existingRelationshipId={existingRelId}
+              />
+            )}
           </div>
         </div>
       </body>

@@ -6,6 +6,12 @@ import { Button, Card, TextArea } from '@/components/ui'
 import { updatePartner, updateRelationship } from '@/lib/actions/relationships'
 import type { Actor, Relationship } from '@/lib/db/schema'
 
+const GENDER_OPTIONS = [
+  { v: '', l: '-' },
+  { v: 'male', l: '남' },
+  { v: 'female', l: '여' },
+]
+
 function dateInputValue(ts: Date | number | null | undefined): string {
   if (!ts) return ''
   const d = ts instanceof Date ? ts : new Date(Number(ts))
@@ -39,6 +45,7 @@ export function PartnerInlineEditor({
 
   const [name, setName] = useState(rel.partner.displayName)
   const [age, setAge] = useState(rel.partner.age?.toString() ?? '')
+  const [gender, setGender] = useState(rel.partner.gender ?? '')
   const [occupation, setOccupation] = useState(rel.partner.occupation ?? '')
   const [rawNotes, setRawNotes] = useState(rel.partner.rawNotes ?? '')
   const [constraintsText, setConstraintsText] = useState(
@@ -60,6 +67,7 @@ export function PartnerInlineEditor({
         await updatePartner(rel.partner.id, {
           displayName: name.trim() || rel.partner.displayName,
           age: age ? parseInt(age, 10) : null,
+          gender: gender || null,
           occupation: occupation.trim() || null,
           rawNotes: rawNotes.trim() || null,
           knownConstraints: constraintsText
@@ -119,7 +127,7 @@ export function PartnerInlineEditor({
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] text-muted uppercase tracking-wider">나이</span>
           <input
@@ -129,6 +137,20 @@ export function PartnerInlineEditor({
             placeholder="27"
             className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
           />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-muted uppercase tracking-wider">성별</span>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="rounded-lg bg-surface-2 border border-border px-2 py-2 text-sm outline-none focus:border-accent"
+          >
+            {GENDER_OPTIONS.map((o) => (
+              <option key={o.v} value={o.v}>
+                {o.l}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] text-muted uppercase tracking-wider">직업</span>

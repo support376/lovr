@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { ChevronDown, ChevronRight, User, Heart, CreditCard, LogOut, Shield } from 'lucide-react'
 import { getSelf } from '@/lib/actions/self'
 import {
-  ensureDefaultRelationship,
   getCurrentRelationship,
   listRelationships,
 } from '@/lib/actions/relationships'
@@ -25,13 +24,8 @@ export default async function SettingsPage({
   const self = await getSelf()
   if (!self) redirect('/onboarding')
 
-  // self 있는데 relationship 없으면 자동 복구.
-  let current = await getCurrentRelationship()
-  if (!current) {
-    await ensureDefaultRelationship()
-    current = await getCurrentRelationship()
-  }
   const all = await listRelationships()
+  const current = await getCurrentRelationship()
   const sp = await searchParams
   const open = sp.open ?? 'self'
 
@@ -54,11 +48,9 @@ export default async function SettingsPage({
           icon={<Heart size={14} />}
           label="상대 정보"
           hint={
-            current
-              ? all.length > 1
-                ? `${current.partner.displayName} · 전체 ${all.length}명`
-                : current.partner.displayName
-              : '—'
+            all.length === 0
+              ? '미등록'
+              : `${current?.partner.displayName ?? '-'} · 전체 ${all.length}명`
           }
           open={open === 'partner'}
         >

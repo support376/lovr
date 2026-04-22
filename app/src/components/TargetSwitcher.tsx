@@ -119,7 +119,7 @@ export function TargetSwitcher({
           className="snap-start shrink-0 w-32 rounded-2xl border border-dashed border-border bg-surface/30 flex flex-col items-center justify-center gap-1 text-muted hover:border-accent hover:text-accent transition-colors p-3"
         >
           <Plus size={18} />
-          <div className="text-xs font-medium">다른 상대</div>
+          <div className="text-xs font-medium">상대 추가</div>
         </Link>
       </div>
     </div>
