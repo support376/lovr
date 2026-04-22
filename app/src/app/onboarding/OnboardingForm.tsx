@@ -5,42 +5,35 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createSelf } from '@/lib/actions/self'
 import { Button, Card, TextInput } from '@/components/ui'
-import { type RelationshipState } from '@/lib/db/schema'
 
 const GENDER_OPTIONS: Array<{ v: 'male' | 'female'; l: string }> = [
   { v: 'male', l: '남성' },
   { v: 'female', l: '여성' },
 ]
 
-// 온보딩에서 노출하는 4개 상태. struggling 은 /me 에서만 변경 가능.
-const STATE_OPTIONS: Array<{ v: RelationshipState; l: string }> = [
-  { v: 'exploring', l: '사귀기 전' },
-  { v: 'dating', l: '사귀는 중' },
-  { v: 'serious', l: '장기·결혼' },
-  { v: 'ended', l: '헤어짐' },
-]
-
+/**
+ * 온보딩 — 이름 + 성별 + 약관. 끝.
+ * 상태(관계 단계)는 이후 대화 중 자연스럽게 전환 (updateRelationship tool).
+ * 상대는 내 성별 반대로 자동 생성 (createSelf 내부).
+ */
 export function OnboardingForm() {
   const [name, setName] = useState('')
   const [gender, setGender] = useState<'male' | 'female' | null>(null)
-  const [state, setState] = useState<RelationshipState | null>(null)
   const [agree, setAgree] = useState(false)
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
-  const canSubmit =
-    !!name.trim() && gender !== null && state !== null && agree && !pending
+  const canSubmit = !!name.trim() && gender !== null && agree && !pending
 
   const submit = () => {
-    if (!canSubmit || gender === null || state === null) return
+    if (!canSubmit || gender === null) return
     setErr(null)
     start(async () => {
       try {
         await createSelf({
           displayName: name.trim(),
           gender,
-          state,
         })
         router.push('/onboarding/first-event')
       } catch (e) {
@@ -87,32 +80,7 @@ export function OnboardingForm() {
             ))}
           </div>
           <span className="text-[10px] text-muted">
-            상대 성별은 자동으로 반대로 설정돼.
-          </span>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs text-muted">지금 관계 상태</span>
-          <div className="grid grid-cols-2 gap-1.5">
-            {STATE_OPTIONS.map((o) => (
-              <button
-                key={o.v}
-                type="button"
-                onClick={() => setState(o.v)}
-                className={`py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                  state === o.v
-                    ? 'bg-accent/15 border-accent/50 text-accent'
-                    : 'bg-surface-2 border-border text-muted hover:border-accent/30'
-                }`}
-              >
-                {o.l}
-              </button>
-            ))}
-          </div>
-          <span className="text-[10px] text-muted">
-            상태가 정해지면 목표는 루바이가 알아서 잡아.
+            상대는 내 성별 반대로 자동 설정돼.
           </span>
         </div>
       </Card>
@@ -156,7 +124,7 @@ export function OnboardingForm() {
         {pending ? '저장 중…' : '시작'}
       </Button>
       <div className="text-[11px] text-muted text-center leading-relaxed">
-        💬 다음 단계에서 카톡 1건만 넣으면 루바이가 바로 코칭 시작해.
+        다음: 대화/기록 1건만 넣으면 루바이가 바로 분석 시작.
       </div>
     </form>
   )

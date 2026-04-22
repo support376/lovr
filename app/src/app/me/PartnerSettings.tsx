@@ -109,13 +109,7 @@ export function PartnerSettings({
         )}
       </div>
 
-      {!current ? (
-        <Card>
-          <div className="text-[11px] text-muted leading-relaxed">
-            아직 등록된 상대가 없어. 위 <strong>추가</strong> 버튼으로 첫 상대 등록.
-          </div>
-        </Card>
-      ) : (
+      {current && (
         <PartnerForm
           key={current.id}
           rel={current}

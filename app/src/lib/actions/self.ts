@@ -58,7 +58,7 @@ export async function createSelf(
   input: SelfInput & {
     displayName: string
     gender: 'male' | 'female'
-    state: RelationshipState
+    state?: RelationshipState
   }
 ): Promise<Actor> {
   const uid = await requireUserId()
@@ -94,7 +94,7 @@ export async function createSelf(
     id: relId,
     userId: uid,
     partnerId,
-    state: input.state,
+    state: input.state ?? 'exploring',
     status: 'active',
   })
 
