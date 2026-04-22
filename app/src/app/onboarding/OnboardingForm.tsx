@@ -5,24 +5,43 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createSelf } from '@/lib/actions/self'
 import { Button, Card, TextArea, TextInput } from '@/components/ui'
+import { type RelationshipState } from '@/lib/db/schema'
+
+const GENDER_OPTIONS: Array<{ v: 'male' | 'female'; l: string }> = [
+  { v: 'male', l: '남자' },
+  { v: 'female', l: '여자' },
+]
+
+// 온보딩에서 노출하는 4개 상태. struggling 은 /me 에서만 변경 가능.
+const STATE_OPTIONS: Array<{ v: RelationshipState; l: string }> = [
+  { v: 'exploring', l: '사귀기 전' },
+  { v: 'dating', l: '사귀는 중' },
+  { v: 'serious', l: '장기·결혼' },
+  { v: 'ended', l: '헤어짐' },
+]
 
 export function OnboardingForm() {
   const [name, setName] = useState('')
+  const [gender, setGender] = useState<'male' | 'female' | null>(null)
+  const [state, setState] = useState<RelationshipState | null>(null)
   const [notes, setNotes] = useState('')
   const [agree, setAgree] = useState(false)
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
 
-  const canSubmit = !!name.trim() && agree && !pending
+  const canSubmit =
+    !!name.trim() && gender !== null && state !== null && agree && !pending
 
   const submit = () => {
-    if (!canSubmit) return
+    if (!canSubmit || gender === null || state === null) return
     setErr(null)
     start(async () => {
       try {
         await createSelf({
           displayName: name.trim(),
+          gender,
+          state,
           rawNotes: notes.trim() || undefined,
         })
         router.push('/')
@@ -49,13 +68,64 @@ export function OnboardingForm() {
           required
         />
       </Card>
+
+      <Card>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted">내 성별</span>
+          <div className="flex gap-1.5">
+            {GENDER_OPTIONS.map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setGender(o.v)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                  gender === o.v
+                    ? 'bg-accent/15 border-accent/50 text-accent'
+                    : 'bg-surface-2 border-border text-muted hover:border-accent/30'
+                }`}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-muted">
+            상대 성별은 자동으로 반대로 설정돼.
+          </span>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs text-muted">지금 관계 상태</span>
+          <div className="grid grid-cols-2 gap-1.5">
+            {STATE_OPTIONS.map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setState(o.v)}
+                className={`py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                  state === o.v
+                    ? 'bg-accent/15 border-accent/50 text-accent'
+                    : 'bg-surface-2 border-border text-muted hover:border-accent/30'
+                }`}
+              >
+                {o.l}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-muted">
+            상태가 정해지면 목표는 루바이가 알아서 잡아.
+          </span>
+        </div>
+      </Card>
+
       <Card>
         <TextArea
           label="자유 메모 (선택) — 자기 자신에 대한 맥락. 자유 서술."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          rows={6}
-          placeholder={`예시:\n- 30대 초, 회사원\n- INFP / 불안형 애착 경향 스스로 의심\n- 최근 연애는 2년 전, 이별 잘 못 매듭지음\n- 이상형은 잘 몰라, 같이 있을 때 편안한 사람`}
+          rows={5}
+          placeholder={`예시:\n- 30대 초, 회사원\n- INFP / 불안형 애착 경향 스스로 의심\n- 최근 연애는 2년 전, 이별 잘 못 매듭지음`}
         />
       </Card>
 
@@ -98,7 +168,7 @@ export function OnboardingForm() {
         {pending ? '저장 중…' : '시작'}
       </Button>
       <div className="text-[11px] text-muted text-center leading-relaxed">
-        💬 상대 등록은 홈에서 할 수 있어. 여기선 본인 맥락만 먼저.
+        💬 다음 단계에서 카톡 1건만 넣으면 루바이가 바로 코칭 시작해.
       </div>
     </form>
   )
