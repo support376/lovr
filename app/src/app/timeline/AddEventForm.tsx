@@ -6,6 +6,7 @@ import { FileText, ImageIcon, Loader2 } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { addEvent, type EventType } from '@/lib/actions/events'
 import { detectFirstTimestamp, extractFromFile } from '@/lib/actions/transcribe'
+import { useSetup } from '@/components/SetupProvider'
 
 const TYPE_OPTIONS: Array<{ v: EventType; l: string; hint: string }> = [
   {
@@ -68,6 +69,7 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
   const router = useRouter()
   const textInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const { needsSetup, open: openSetup } = useSetup()
 
   const currentHint = TYPE_OPTIONS.find((o) => o.v === type)?.hint
 
@@ -128,6 +130,10 @@ export function AddEventForm({ relationshipId }: { relationshipId: string }) {
 
   const submit = () => {
     if (!content.trim()) return
+    if (needsSetup) {
+      openSetup()
+      return
+    }
     setErr(null)
     const ts = noDate
       ? null

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, ImageIcon, Loader2 } from 'lucide-react'
+import { FileText, ImageIcon, Loader2, X } from 'lucide-react'
 import { addEvent } from '@/lib/actions/events'
 import { createRelationship } from '@/lib/actions/relationships'
 import { updateSelf } from '@/lib/actions/self'
@@ -34,11 +34,13 @@ export function FirstSetupModal({
   needsRelationship,
   needsFirstEvent,
   existingRelationshipId,
+  onClose,
 }: {
   needsGender: boolean
   needsRelationship: boolean
   needsFirstEvent: boolean
   existingRelationshipId: string | null
+  onClose: () => void
 }) {
   const [gender, setGender] = useState<'male' | 'female' | null>(null)
   const [state, setState] = useState<RelationshipState | null>(null)
@@ -119,6 +121,7 @@ export function FirstSetupModal({
           })
         }
 
+        onClose()
         router.refresh()
       } catch (e) {
         setErr((e as Error).message)
@@ -127,13 +130,28 @@ export function FirstSetupModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
       <div className="w-full max-w-md bg-surface border border-border rounded-2xl p-5 my-4 flex flex-col gap-4">
-        <div>
-          <div className="text-lg font-bold">시작 전에 3가지만</div>
-          <div className="text-[11px] text-muted mt-1 leading-relaxed">
-            이거 넣으면 루바이가 바로 분석 시작해. 상대 이름·나이·직업 같은 건 나중에 대화하면서 알아서 채워져.
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <div className="text-lg font-bold">시작 전에 3가지만</div>
+            <div className="text-[11px] text-muted mt-1 leading-relaxed">
+              이거 넣으면 루바이가 바로 분석 시작해. 상대 이름·나이·직업 같은 건 나중에 대화하면서 알아서 채워져.
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 w-7 h-7 rounded-full bg-surface-2 text-muted hover:text-text flex items-center justify-center"
+            aria-label="닫기"
+          >
+            <X size={14} />
+          </button>
         </div>
 
         {needsGender && (

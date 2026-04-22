@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { BottomNav } from '@/components/BottomNav'
 import { TopBar } from '@/components/TopBar'
-import { FirstSetupModal } from '@/components/FirstSetupModal'
+import { SetupProvider, SetupBanner } from '@/components/SetupProvider'
 import { getSelf } from '@/lib/actions/self'
 import { getCurrentRelationship } from '@/lib/actions/relationships'
 import { listEvents } from '@/lib/actions/events'
@@ -54,7 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
 
-  const showSetupModal =
+  const showSetup =
     !!self && (needsGender || needsRelationship || needsFirstEvent)
 
   return (
@@ -100,18 +100,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               aria-hidden="true"
             />
             {showNav && <TopBar />}
-            <main className="flex-1 min-h-0 flex flex-col overflow-y-auto safe-bottom">
-              {children}
-            </main>
+            <SetupProvider
+              needsGender={showSetup && needsGender}
+              needsRelationship={showSetup && needsRelationship}
+              needsFirstEvent={showSetup && needsFirstEvent}
+              existingRelationshipId={existingRelId}
+            >
+              {showSetup && <SetupBanner />}
+              <main className="flex-1 min-h-0 flex flex-col overflow-y-auto safe-bottom">
+                {children}
+              </main>
+            </SetupProvider>
             {showNav && <BottomNav />}
-            {showSetupModal && (
-              <FirstSetupModal
-                needsGender={needsGender}
-                needsRelationship={needsRelationship}
-                needsFirstEvent={needsFirstEvent}
-                existingRelationshipId={existingRelId}
-              />
-            )}
           </div>
         </div>
       </body>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/conversations'
 import { usePlan } from '@/lib/plan'
 import { UpgradeGate } from '@/components/UpgradeGate'
+import { useSetup } from '@/components/SetupProvider'
 
 type Archive = {
   id: string
@@ -56,6 +57,7 @@ export function LuvAIChat({
   const scrollRef = useRef<HTMLDivElement>(null)
   const sessionStartModelAtRef = useRef<number | null>(modelUpdatedAt)
   const plan = usePlan()
+  const { needsSetup, open: openSetup } = useSetup()
   const saveRequiresPaid = archives.length >= 3 && plan === 'free'
 
   useEffect(() => {
@@ -79,6 +81,10 @@ export function LuvAIChat({
   const submit = () => {
     const text = input.trim()
     if (!text) return
+    if (needsSetup) {
+      openSetup()
+      return
+    }
     if (readonlyView) setReadonlyView(null)
     const userMsg: LuvAIMessage = { role: 'user', content: text }
     const next = [...messages, userMsg]
