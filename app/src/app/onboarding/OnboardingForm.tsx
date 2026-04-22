@@ -44,7 +44,7 @@ export function OnboardingForm() {
           state,
           rawNotes: notes.trim() || undefined,
         })
-        router.push('/')
+        router.push('/onboarding/first-event')
       } catch (e) {
         setErr((e as Error).message)
       }

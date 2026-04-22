@@ -1,6 +1,8 @@
+import { redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
 import { getCurrentRelationship } from '@/lib/actions/relationships'
 import { listConversations } from '@/lib/actions/conversations'
+import { listEvents } from '@/lib/actions/events'
 import { currentUserId } from '@/lib/supabase/server'
 import { Landing } from '@/components/Landing'
 import { CurrentTargetHeader } from '@/components/CurrentTargetHeader'
@@ -35,6 +37,12 @@ export default async function LuvAIHome() {
       console.error('[LuvAIHome getCurrentRelationship]', e)
     }
 
+    // 첫 기록 게이트 — 활성 관계 있는데 events 0 건이면 first-event 로.
+    if (cur) {
+      const seedCheck = await listEvents(cur.id, 1).catch(() => [])
+      if (seedCheck.length === 0) redirect('/onboarding/first-event')
+    }
+
     const relationshipId = cur?.id ?? null
     const modelUpdatedAt = cur?.model?.updatedAt ?? null
 
@@ -56,6 +64,8 @@ export default async function LuvAIHome() {
       </>
     )
   } catch (e) {
+    // Next.js redirect() throws — let it bubble up.
+    if ((e as { digest?: string })?.digest?.startsWith('NEXT_REDIRECT')) throw e
     console.error('[LuvAIHome render]', e)
     return (
       <div className="p-5 text-sm">
