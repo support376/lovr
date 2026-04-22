@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
-import { getCurrentRelationship } from '@/lib/actions/relationships'
+import {
+  ensureDefaultRelationship,
+  getCurrentRelationship,
+} from '@/lib/actions/relationships'
 import { listConversations } from '@/lib/actions/conversations'
 import { listEvents } from '@/lib/actions/events'
 import { generateOpeningMessage } from '@/lib/actions/luvai'
@@ -36,6 +39,17 @@ export default async function LuvAIHome() {
       cur = await getCurrentRelationship()
     } catch (e) {
       console.error('[LuvAIHome getCurrentRelationship]', e)
+    }
+
+    // self 있는데 relationship 없으면 자동 복구 (기존 유저 포함).
+    // "상대 등록" 은 사용자가 명시적으로 할 조건 아님 — 자동.
+    if (!cur) {
+      try {
+        const newRelId = await ensureDefaultRelationship()
+        if (newRelId) cur = await getCurrentRelationship()
+      } catch (e) {
+        console.error('[LuvAIHome ensureDefaultRelationship]', e)
+      }
     }
 
     // 첫 기록 게이트 — 활성 관계 있는데 events 0 건이면 first-event 로.

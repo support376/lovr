@@ -70,6 +70,66 @@ export async function getCurrentRelationship(): Promise<
   return all.find((r) => r.status === 'active') ?? all[0] ?? null
 }
 
+/**
+ * self 있는데 relationship 없는 유저 자동 복구.
+ * 기존 유저(구 온보딩으로 가입)도 홈 진입 시 바로 AI 쓸 수 있게.
+ *
+ * Why: 상대 등록을 필수 조건에서 완전히 제거.
+ *      self.gender 만 있으면 상대는 자동 반대 성별로, state='exploring' 기본값.
+ *      gender 도 없으면(아주 오래된 self) partner.gender = null — 그래도 AI 동작.
+ */
+export async function ensureDefaultRelationship(): Promise<string | null> {
+  const uid = await requireUserId()
+  const existing = await db
+    .select({ id: relationships.id })
+    .from(relationships)
+    .where(eq(relationships.userId, uid))
+    .limit(1)
+  if (existing.length > 0) return existing[0].id
+
+  const [self] = await db
+    .select({ gender: actors.gender })
+    .from(actors)
+    .where(and(eq(actors.userId, uid), eq(actors.role, 'self')))
+    .limit(1)
+  if (!self) return null // onboarding 아직 — 상위가 처리
+
+  const partnerGender =
+    self.gender === 'male'
+      ? 'female'
+      : self.gender === 'female'
+        ? 'male'
+        : null
+
+  const partnerId = `actor-${randomUUID()}`
+  const relId = `rel-${randomUUID()}`
+
+  await db.insert(actors).values({
+    id: partnerId,
+    userId: uid,
+    role: 'partner',
+    displayName: '상대',
+    gender: partnerGender,
+  })
+  await db.insert(relationships).values({
+    id: relId,
+    userId: uid,
+    partnerId,
+    state: 'exploring',
+    status: 'active',
+  })
+
+  const store = await cookies()
+  store.set('focusRel', relId, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: 'lax',
+  })
+
+  revalidatePath('/')
+  return relId
+}
+
 export async function createRelationship(input: {
   partnerName: string
   partnerRawNotes?: string

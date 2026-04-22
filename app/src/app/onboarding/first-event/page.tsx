@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation'
 import { getSelf } from '@/lib/actions/self'
-import { getCurrentRelationship } from '@/lib/actions/relationships'
+import {
+  ensureDefaultRelationship,
+  getCurrentRelationship,
+} from '@/lib/actions/relationships'
 import { listEvents } from '@/lib/actions/events'
 import { PageHeader } from '@/components/ui'
 import { FirstEventForm } from './FirstEventForm'
@@ -17,7 +20,11 @@ export default async function FirstEventPage() {
   const self = await getSelf()
   if (!self) redirect('/onboarding')
 
-  const cur = await getCurrentRelationship()
+  let cur = await getCurrentRelationship()
+  if (!cur) {
+    await ensureDefaultRelationship()
+    cur = await getCurrentRelationship()
+  }
   if (!cur) redirect('/onboarding')
 
   const ev = await listEvents(cur.id, 1)

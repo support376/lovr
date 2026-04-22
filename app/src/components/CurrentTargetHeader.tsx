@@ -18,18 +18,9 @@ export function CurrentTargetHeader({
 }: {
   rel: (Relationship & { partner: Actor }) | null
 }) {
-  if (!rel) {
-    return (
-      <div className="px-5 pt-3 pb-2">
-        <Link
-          href="/me?open=partner"
-          className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border border-dashed border-border text-muted hover:border-accent/40 hover:text-accent"
-        >
-          <Settings size={11} /> 상대 등록 안 됨 · 설정에서 추가
-        </Link>
-      </div>
-    )
-  }
+  // rel 없으면 헤더 숨김 — "상대 등록" 은 필수 조건 아님.
+  // 홈 서버 컴포넌트가 ensureDefaultRelationship 으로 복구함.
+  if (!rel) return null
 
   const stateLabel =
     STATE_LABEL[rel.state as RelationshipState] ?? rel.state
