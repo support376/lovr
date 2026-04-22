@@ -18,9 +18,12 @@ export const luvaiTools: Anthropic.Messages.Tool[] = [
   {
     name: 'addEvent',
     description:
-      '대화에서 사용자가 새로 언급한 사건/메모/대화 원문을 events 에 자동 저장. ' +
-      '예: "어제 만났어" → event 로 저장, "걔가 이렇게 말했대" → chat 으로 인용 저장. ' +
-      '응답 본문에는 "기록했어" 류 언급 금지. 조용히 호출.',
+      '★ 루프 데이터화의 핵심. 다음 상황에서 반드시 호출:\n' +
+      '1) 유저가 체크인 보고할 때: "안 보냈어", "운동했어", "72시간 참음" 등 실행 여부 보고 → type="note" 또는 "event"\n' +
+      '2) 유저가 새 사건 언급: "어제 만났어", "오늘 답 왔어" → type="event"\n' +
+      '3) 유저가 상대 발언 전달: "걔가 이렇게 말했대" → type="chat"\n' +
+      '4) 유저의 감정/관찰 메모: "오늘 SNS 3번 확인함" → type="note"\n' +
+      '이 기록이 다음 대화의 근거가 됨. 응답 본문에는 "기록했어/저장했어" 언급 금지 — 조용히.',
     input_schema: {
       type: 'object',
       properties: {
