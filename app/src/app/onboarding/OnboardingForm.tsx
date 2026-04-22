@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createSelf } from '@/lib/actions/self'
-import { Button, Card, TextArea, TextInput } from '@/components/ui'
+import { Button, Card, TextInput } from '@/components/ui'
 import { type RelationshipState } from '@/lib/db/schema'
 
 const GENDER_OPTIONS: Array<{ v: 'male' | 'female'; l: string }> = [
@@ -24,7 +24,6 @@ export function OnboardingForm() {
   const [name, setName] = useState('')
   const [gender, setGender] = useState<'male' | 'female' | null>(null)
   const [state, setState] = useState<RelationshipState | null>(null)
-  const [notes, setNotes] = useState('')
   const [agree, setAgree] = useState(false)
   const [pending, start] = useTransition()
   const [err, setErr] = useState<string | null>(null)
@@ -42,7 +41,6 @@ export function OnboardingForm() {
           displayName: name.trim(),
           gender,
           state,
-          rawNotes: notes.trim() || undefined,
         })
         router.push('/onboarding/first-event')
       } catch (e) {
@@ -117,16 +115,6 @@ export function OnboardingForm() {
             상태가 정해지면 목표는 루바이가 알아서 잡아.
           </span>
         </div>
-      </Card>
-
-      <Card>
-        <TextArea
-          label="자유 메모 (선택) — 자기 자신에 대한 맥락. 자유 서술."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={5}
-          placeholder={`예시:\n- 30대 초, 회사원\n- INFP / 불안형 애착 경향 스스로 의심\n- 최근 연애는 2년 전, 이별 잘 못 매듭지음`}
-        />
       </Card>
 
       <Card className="!p-3">

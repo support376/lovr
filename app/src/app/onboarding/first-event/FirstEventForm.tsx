@@ -2,18 +2,15 @@
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, ImageIcon, Loader2 } from 'lucide-react'
+import { FileText, ImageIcon, Loader2, ArrowRight } from 'lucide-react'
 import { Button, Card } from '@/components/ui'
 import { addEvent } from '@/lib/actions/events'
+import { generateOpeningMessage } from '@/lib/actions/luvai'
 import { detectFirstTimestamp, extractFromFile } from '@/lib/actions/transcribe'
 
 /**
- * 온보딩 직후 — 첫 기록 1건 강제 입력.
- * 이거 있어야 루바이가 첫 메시지 만들 재료가 생김.
- *
- * AddEventForm 의 미니멀 버전:
- *   - type 선택 없음 (항상 'chat' 으로 저장)
- *   - 날짜 입력 UI 없음. OCR/텍스트에서 자동 감지된 timestamp 만 사용.
+ * 온보딩 직후 — 첫 기록 1건 입력.
+ * 제출하면 같은 화면에서 루바이 응답 인라인 표시 → "계속 대화 →" 로 홈 이동.
  */
 export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
   const [content, setContent] = useState('')
@@ -22,6 +19,7 @@ export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
   const [uploading, setUploading] = useState<null | 'text' | 'image'>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [reply, setReply] = useState<string | null>(null)
   const router = useRouter()
   const textInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -45,13 +43,13 @@ export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
         setInfo(
           kind === 'image'
             ? '✓ OCR 완료 · 첫 메시지 시각 자동 반영'
-            : '✓ 텍스트 파일 처리됨 · 첫 메시지 시각 자동 반영'
+            : '✓ 텍스트 처리됨 · 첫 메시지 시각 자동 반영'
         )
       } else {
         setInfo(
           kind === 'image'
-            ? '✓ OCR 완료 · 시각 탐지 못 함 (그래도 OK, 그냥 제출)'
-            : '✓ 텍스트 처리됨 · 시각 탐지 못 함 (그래도 OK, 그냥 제출)'
+            ? '✓ OCR 완료'
+            : '✓ 텍스트 처리됨'
         )
       }
     } catch (e) {
@@ -80,11 +78,39 @@ export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
           content: content.trim(),
           timestamp: detectedTs,
         })
-        router.push('/')
+        const opening = await generateOpeningMessage()
+        if (opening) setReply(opening)
+        else {
+          // 응답 실패해도 일단 홈으로 — 홈에서도 opening 재시도함
+          router.push('/')
+        }
       } catch (e) {
         setErr((e as Error).message)
       }
     })
+  }
+
+  // 응답 받은 후 — 루바이 메시지 + 계속 대화 CTA
+  if (reply) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="text-[11px] text-muted px-1">
+          루바이가 네 기록을 봤어.
+        </div>
+        <Card className="border-accent/30 bg-accent/5">
+          <div className="whitespace-pre-wrap text-[15px] leading-relaxed">
+            {reply}
+          </div>
+        </Card>
+        <Button onClick={() => router.push('/')} className="gap-2">
+          계속 대화하기
+          <ArrowRight size={16} />
+        </Button>
+        <div className="text-[11px] text-muted text-center leading-relaxed">
+          정보 더 주면 더 정확해져 — 대화 중에 루바이가 알아서 물어볼게.
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -108,7 +134,6 @@ export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
           className="rounded-lg bg-surface-2 border border-border px-3 py-2.5 text-sm outline-none focus:border-accent resize-y min-h-[200px] whitespace-pre-wrap"
         />
 
-        {/* 업로드 도우미 */}
         <div className="flex gap-1.5 flex-wrap">
           <input
             ref={textInputRef}
@@ -175,8 +200,11 @@ export function FirstEventForm({ relationshipId }: { relationshipId: string }) {
           onClick={submit}
           disabled={pending || uploading !== null || !content.trim()}
         >
-          {pending ? '저장 중…' : '루바이 시작'}
+          {pending ? '루바이가 읽는 중…' : '받아보기'}
         </Button>
+        <div className="text-[11px] text-muted text-center leading-relaxed">
+          일단 한 건만 넣어봐. 더 넣을수록 정확해지지만 시작은 이거 하나면 돼.
+        </div>
       </div>
     </Card>
   )
