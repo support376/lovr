@@ -126,7 +126,7 @@ export async function askLuvAI(history: LuvAIMessage[]): Promise<{
       system,
       initialMessages,
       toolCtx,
-      maxTokens: 500,
+      maxTokens: 600,
     })
     return { reply, partnerName: cur?.partner.displayName ?? null }
   } catch (e) {
